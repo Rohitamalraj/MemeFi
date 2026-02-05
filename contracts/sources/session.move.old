@@ -1,0 +1,341 @@
+/// MemeFi Trading Session Module
+/// Implements private trading sessions with delayed settlement
+module memefi::session {
+    use sui::table::{Self, Table};
+    use sui::balance::{Self, Balance};
+    use sui::coin::{Self, Coin};
+    use sui::event;
+    use std::string::{Self, String};
+    use memefi::token::{Self, LaunchRules};
+
+    /// Errors
+    const ESessionNotActive: u64 = 1;
+    const ESessionEnded: u64 = 2;
+    const ENotParticipant: u64 = 3;
+    const EInsufficientBalance: u64 = 4;
+    const ESessionNotEnded: u64 = 5;
+    const EAlreadySettled: u64 = 6;
+    const EWrongPhase: u64 = 7;
+    const ENotSessionOwner: u64 = 8;
+
+    /// Session states
+    const STATE_ACTIVE: u8 = 0;
+    const STATE_ENDED: u8 = 1;
+    const STATE_SETTLED: u8 = 2;
+
+    /// Trading session with private balances
+    public struct TradingSession<phantom T> has key, store {
+        id: UID,
+        session_name: String,
+        token_name: String,
+        creator: address,
+        start_time: u64,
+        end_time: u64,
+        state: u8,
+        /// Private balances - only visible within session
+        balances: Table<address, u64>,
+        /// Participants list
+        participants: vector<address>,
+        /// Total volume traded
+        volume: u64,
+        /// ENS identities (simplified)
+        identities: Table<address, String>,
+        /// Required token phase (must be PUBLIC or OPEN)
+        required_phase: u8,
+    }
+
+    /// Session info for querying
+    public struct SessionInfo has copy, drop, store {
+        session_id: ID,
+        session_name: String,
+        participant_count: u64,
+        volume: u64,
+        state: u8,
+        time_remaining: u64,
+    }
+
+    /// Events
+    public struct SessionCreated has copy, drop {
+        session_id: ID,
+        session_name: String,
+        creator: address,
+        duration: u64,
+    }
+
+    public struct ParticipantJoined has copy, drop {
+        session_id: ID,
+        participant: address,
+        identity: String,
+    }
+
+    public struct TradeExecuted has copy, drop {
+        session_id: ID,
+        trader: address,
+        amount: u64,
+        is_buy: bool,
+    }
+
+    public struct SessionSettled has copy, drop {
+        session_id: ID,
+        total_volume: u64,
+        participant_count: u64,
+    }
+
+    /// Create a new trading session (only allowed in PUBLIC or OPEN phase)
+    public entry fun create_session<T>(
+        token_rules: &LaunchRules,
+        name: vector<u8>,
+        token_name: vector<u8>,
+        duration_ms: u64,
+        ctx: &mut TxContext
+    ) {
+        let creator = tx_context::sender(ctx);
+        let start_time = tx_context::epoch_timestamp_ms(ctx);
+        let end_time = start_time + duration_ms;
+
+        // Sessions only allowed in PUBLIC phase or later
+        let phase = token::get_phase(token_rules);
+        assert!(phase >= 1, EWrongPhase); // Must be PUBLIC (1) or OPEN (2)
+
+        let session_uid = object::new(ctx);
+        let session_id = object::uid_to_inner(&session_uid);
+
+        let session = TradingSession<T> {
+            id: session_uid,
+            session_name: string::utf8(name),
+            token_name: string::utf8(token_name),
+            creator,
+            start_time,
+            end_time,
+            state: STATE_ACTIVE,
+            balances: table::new(ctx),
+            participants: vector::empty(),
+            volume: 0,
+            identities: table::new(ctx),
+            required_phase: phase,
+        };
+
+        event::emit(SessionCreated {
+            session_id,
+            session_name: session.session_name,
+            creator,
+            duration: duration_ms,
+        });
+
+        transfer::share_object(session);
+    }
+
+    /// Join a session with ENS identity
+    public entry fun join_session<T>(
+        session: &mut TradingSession<T>,
+        ens_name: vector<u8>,
+        ctx: &TxContext
+    ) {
+        let participant = tx_context::sender(ctx);
+        let current_time = tx_context::epoch_timestamp_ms(ctx);
+
+        assert!(session.state == STATE_ACTIVE, ESessionNotActive);
+        assert!(current_time < session.end_time, ESessionEnded);
+
+        // Add participant
+        if (!vector::contains(&session.participants, &participant)) {
+            vector::push_back(&mut session.participants, participant);
+        };
+
+        // Set identity
+        let identity = string::utf8(ens_name);
+        if (table::contains(&session.identities, participant)) {
+            let id_ref = table::borrow_mut(&mut session.identities, participant);
+            *id_ref = identity;
+        } else {
+            table::add(&mut session.identities, participant, identity);
+        };
+
+        event::emit(ParticipantJoined {
+            session_id: object::uid_to_inner(&session.id),
+            participant,
+            identity,
+        });
+    }
+
+    /// Buy tokens in session (private balance)
+    public entry fun buy_in_session<T>(
+        session: &mut TradingSession<T>,
+        amount: u64,
+        ctx: &TxContext
+    ) {
+        let trader = tx_context::sender(ctx);
+        let current_time = tx_context::epoch_timestamp_ms(ctx);
+
+        assert!(session.state == STATE_ACTIVE, ESessionNotActive);
+        assert!(current_time < session.end_time, ESessionEnded);
+        assert!(vector::contains(&session.participants, &trader), ENotParticipant);
+
+        // Update private balance
+        let current_balance = if (table::contains(&session.balances, trader)) {
+            *table::borrow(&session.balances, trader)
+        } else {
+            0
+        };
+
+        let new_balance = current_balance + amount;
+
+        if (table::contains(&session.balances, trader)) {
+            let balance_ref = table::borrow_mut(&mut session.balances, trader);
+            *balance_ref = new_balance;
+        } else {
+            table::add(&mut session.balances, trader, new_balance);
+        };
+
+        // Update volume
+        session.volume = session.volume + amount;
+
+        event::emit(TradeExecuted {
+            session_id: object::uid_to_inner(&session.id),
+            trader,
+            amount,
+            is_buy: true,
+        });
+    }
+
+    /// Sell tokens in session (private balance)
+    public entry fun sell_in_session<T>(
+        session: &mut TradingSession<T>,
+        amount: u64,
+        ctx: &TxContext
+    ) {
+        let trader = tx_context::sender(ctx);
+        let current_time = tx_context::epoch_timestamp_ms(ctx);
+
+        assert!(session.state == STATE_ACTIVE, ESessionNotActive);
+        assert!(current_time < session.end_time, ESessionEnded);
+        assert!(vector::contains(&session.participants, &trader), ENotParticipant);
+
+        // Check balance
+        let current_balance = if (table::contains(&session.balances, trader)) {
+            *table::borrow(&session.balances, trader)
+        } else {
+            0
+        };
+
+        assert!(current_balance >= amount, EInsufficientBalance);
+
+        let new_balance = current_balance - amount;
+
+        let balance_ref = table::borrow_mut(&mut session.balances, trader);
+        *balance_ref = new_balance;
+
+        // Update volume
+        session.volume = session.volume + amount;
+
+        event::emit(TradeExecuted {
+            session_id: object::uid_to_inner(&session.id),
+            trader,
+            amount,
+            is_buy: false,
+        });
+    }
+
+    /// End session (anyone can call after time expires)
+    public entry fun end_session<T>(
+        session: &mut TradingSession<T>,
+        ctx: &TxContext
+    ) {
+        let current_time = tx_context::epoch_timestamp_ms(ctx);
+        
+        assert!(current_time >= session.end_time, ESessionNotEnded);
+        assert!(session.state == STATE_ACTIVE, ESessionNotActive);
+
+        session.state = STATE_ENDED;
+    }
+
+    /// Settle session - transfer final balances to wallets (owner only)
+    public entry fun settle_session<T>(
+        session: &mut TradingSession<T>,
+        ctx: &TxContext
+    ) {
+        let caller = tx_context::sender(ctx);
+        
+        assert!(session.state == STATE_ENDED, ESessionNotEnded);
+        assert!(caller == session.creator, ENotSessionOwner);
+
+        session.state = STATE_SETTLED;
+
+        event::emit(SessionSettled {
+            session_id: object::uid_to_inner(&session.id),
+            total_volume: session.volume,
+            participant_count: vector::length(&session.participants),
+        });
+
+        // Note: Actual token transfers would happen here
+        // This is a simplified version - in production, you'd transfer
+        // the actual token balances to participant wallets
+    }
+
+    /// Get participant balance (only visible to participant or after settlement)
+    public fun get_balance<T>(
+        session: &TradingSession<T>,
+        participant: address,
+        ctx: &TxContext
+    ): u64 {
+        let caller = tx_context::sender(ctx);
+        
+        // Only show balance to the participant themselves or after settlement
+        if (caller == participant || session.state == STATE_SETTLED) {
+            if (table::contains(&session.balances, participant)) {
+                return *table::borrow(&session.balances, participant)
+            }
+        };
+        
+        0
+    }
+
+    /// Get session info
+    public fun get_session_info<T>(
+        session: &TradingSession<T>,
+        ctx: &TxContext
+    ): SessionInfo {
+        let current_time = tx_context::epoch_timestamp_ms(ctx);
+        let time_remaining = if (current_time < session.end_time) {
+            session.end_time - current_time
+        } else {
+            0
+        };
+
+        SessionInfo {
+            session_id: object::uid_to_inner(&session.id),
+            session_name: session.session_name,
+            participant_count: vector::length(&session.participants),
+            volume: session.volume,
+            state: session.state,
+            time_remaining,
+        }
+    }
+
+    /// Get participant identity
+    public fun get_identity<T>(
+        session: &TradingSession<T>,
+        participant: address
+    ): String {
+        if (table::contains(&session.identities, participant)) {
+            *table::borrow(&session.identities, participant)
+        } else {
+            string::utf8(b"anonymous")
+        }
+    }
+
+    /// Check if session is active
+    public fun is_active<T>(session: &TradingSession<T>): bool {
+        session.state == STATE_ACTIVE
+    }
+
+    /// Get total volume
+    public fun get_volume<T>(session: &TradingSession<T>): u64 {
+        session.volume
+    }
+
+    /// Get participant count
+    public fun get_participant_count<T>(session: &TradingSession<T>): u64 {
+        vector::length(&session.participants)
+    }
+}

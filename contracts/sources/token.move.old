@@ -1,0 +1,317 @@
+/// MemeFi Token Module
+/// Implements fair launch tokens with embedded rule enforcement
+module memefi::token {
+    use sui::coin::{Self, Coin, TreasuryCap};
+    use sui::balance::{Self, Balance};
+    use sui::table::{Self, Table};
+    use sui::event;
+    use std::string::{Self, String};
+    use std::option;
+
+    /// Errors
+    const EExceedsMaxBuy: u64 = 1;
+    const ETransfersLocked: u64 = 2;
+    const EPhaseNotEnded: u64 = 3;
+    const ENotOwner: u64 = 4;
+    const EInvalidPhase: u64 = 5;
+    const EInsufficientSupply: u64 = 6;
+
+    /// Launch phases
+    const PHASE_LAUNCH: u8 = 0;
+    const PHASE_PUBLIC: u8 = 1;
+    const PHASE_OPEN: u8 = 2;
+
+    /// One-Time-Witness for token creation (must match module name)
+    public struct TOKEN has drop {}
+
+    /// Launch rules embedded in the token
+    public struct LaunchRules has key, store {
+        id: UID,
+        token_name: String,
+        token_symbol: String,
+        total_supply: u64,
+        max_buy_per_wallet: u64,
+        phase_duration_ms: u64,
+        transfers_locked: bool,
+        current_phase: u8,
+        launch_time: u64,
+        creator: address,
+    }
+
+    /// Treasury holder for minting tokens
+    public struct TokenTreasury<phantom T> has key, store {
+        id: UID,
+        cap: TreasuryCap<T>,
+        rules_id: ID,
+    }
+
+    /// Wallet tracking for max buy enforcement
+    public struct WalletRegistry has key {
+        id: UID,
+        purchases: Table<address, u64>,
+    }
+
+    /// Events
+    public struct TokenLaunched has copy, drop {
+        token_name: String,
+        creator: address,
+        total_supply: u64,
+        max_buy: u64,
+    }
+
+    public struct PurchaseMade has copy, drop {
+        buyer: address,
+        amount: u64,
+        total_bought: u64,
+    }
+
+    public struct PhaseChanged has copy, drop {
+        token_name: String,
+        old_phase: u8,
+        new_phase: u8,
+        timestamp: u64,
+    }
+
+    /// Create a new meme token with launch rules
+    /// This function creates the actual coin and mints the total supply
+    public fun create_token<T: drop>(
+        witness: T,
+        name: vector<u8>,
+        symbol: vector<u8>,
+        decimals: u8,
+        total_supply: u64,
+        max_buy_per_wallet: u64,
+        phase_duration_ms: u64,
+        transfers_locked: bool,
+        ctx: &mut TxContext
+    ) {
+        let creator = tx_context::sender(ctx);
+        let launch_time = tx_context::epoch_timestamp_ms(ctx);
+
+        // Create the actual coin using Sui's coin module
+        let (treasury_cap, metadata) = coin::create_currency(
+            witness,
+            decimals,
+            symbol,
+            name,
+            b"",
+            option::none(),
+            ctx
+        );
+
+        // Create the launch rules
+        let rules_uid = object::new(ctx);
+        let rules_id = object::uid_to_inner(&rules_uid);
+        
+        let rules = LaunchRules {
+            id: rules_uid,
+            token_name: string::utf8(name),
+            token_symbol: string::utf8(symbol),
+            total_supply,
+            max_buy_per_wallet,
+            phase_duration_ms,
+            transfers_locked,
+            current_phase: PHASE_LAUNCH,
+            launch_time,
+            creator,
+        };
+
+        // Create treasury holder
+        let treasury = TokenTreasury {
+            id: object::new(ctx),
+            cap: treasury_cap,
+            rules_id,
+        };
+
+        // Create wallet registry
+        let registry = WalletRegistry {
+            id: object::new(ctx),
+            purchases: table::new(ctx),
+        };
+
+        // Emit launch event
+        event::emit(TokenLaunched {
+            token_name: rules.token_name,
+            creator,
+            total_supply,
+            max_buy: max_buy_per_wallet,
+        });
+
+        // Freeze metadata (immutable token info)
+        transfer::public_freeze_object(metadata);
+        
+        // Share treasury for purchases
+        transfer::share_object(treasury);
+        
+        // Transfer rules to creator
+        transfer::transfer(rules, creator);
+        
+        // Share registry
+        transfer::share_object(registry);
+    }
+
+    /// Entry function for launching a token from transactions
+    /// This is the function to call from your frontend
+    public entry fun launch_token(
+        name: vector<u8>,
+        symbol: vector<u8>,
+        decimals: u8,
+        total_supply: u64,
+        max_buy_per_wallet: u64,
+        phase_duration_ms: u64,
+        transfers_locked: bool,
+        ctx: &mut TxContext
+    ) {
+        // Create a witness instance for this token
+        let witness = TOKEN {};
+        
+        // Call the internal create_token function
+        create_token(
+            witness,
+            name,
+            symbol,
+            decimals,
+            total_supply,
+            max_buy_per_wallet,
+            phase_duration_ms,
+            transfers_locked,
+            ctx
+        );
+    }
+
+    /// Buy tokens - enforces max buy rules and mints actual coins
+    public entry fun buy_tokens<T>(
+        treasury: &mut TokenTreasury<T>,
+        rules: &LaunchRules,
+        registry: &mut WalletRegistry,
+        amount: u64,
+        ctx: &mut TxContext
+    ) {
+        let buyer = tx_context::sender(ctx);
+        
+        // Verify treasury matches rules
+        assert!(treasury.rules_id == object::uid_to_inner(&rules.id), EInvalidPhase);
+        
+        // Check current purchases
+        let current_bought = if (table::contains(&registry.purchases, buyer)) {
+            *table::borrow(&registry.purchases, buyer)
+        } else {
+            0
+        };
+
+        let new_total = current_bought + amount;
+
+        // Enforce max buy rule during launch phase
+        if (rules.current_phase == PHASE_LAUNCH) {
+            assert!(new_total <= rules.max_buy_per_wallet, EExceedsMaxBuy);
+        };
+
+        // Mint tokens to buyer
+        let coin = coin::mint(&mut treasury.cap, amount, ctx);
+        transfer::public_transfer(coin, buyer);
+
+        // Update registry
+        if (table::contains(&registry.purchases, buyer)) {
+            let bought_ref = table::borrow_mut(&mut registry.purchases, buyer);
+            *bought_ref = new_total;
+        } else {
+            table::add(&mut registry.purchases, buyer, new_total);
+        };
+
+        // Emit purchase event
+        event::emit(PurchaseMade {
+            buyer,
+            amount,
+            total_bought: new_total,
+        });
+    }
+
+    /// Transfer tokens - enforces transfer restrictions
+    public entry fun transfer_token<T>(
+        rules: &LaunchRules,
+        coin: Coin<T>,
+        recipient: address,
+        ctx: &TxContext
+    ) {
+        // Check if transfers are allowed
+        assert!(can_transfer(rules, tx_context::sender(ctx), recipient, ctx), ETransfersLocked);
+        
+        // Transfer the coin
+        transfer::public_transfer(coin, recipient);
+    }
+
+    /// Validate transfer based on current rules
+    public fun can_transfer(
+        rules: &LaunchRules,
+        _from: address,
+        _to: address,
+        ctx: &TxContext
+    ): bool {
+        // Update phase if needed
+        let current_time = tx_context::epoch_timestamp_ms(ctx);
+        let time_since_launch = current_time - rules.launch_time;
+        let should_be_phase = (time_since_launch / rules.phase_duration_ms) as u8;
+
+        // If in launch phase and transfers locked, block transfers
+        if (rules.current_phase == PHASE_LAUNCH && rules.transfers_locked) {
+            return false
+        };
+
+        // Allow transfers in public and open phases
+        if (should_be_phase >= PHASE_PUBLIC) {
+            return true
+        };
+
+        false
+    }
+
+    /// Advance phase (can be called by anyone after time passes)
+    public entry fun advance_phase(
+        rules: &mut LaunchRules,
+        ctx: &TxContext
+    ) {
+        let current_time = tx_context::epoch_timestamp_ms(ctx);
+        let time_since_launch = current_time - rules.launch_time;
+        let should_be_phase = (time_since_launch / rules.phase_duration_ms) as u8;
+
+        assert!(should_be_phase > rules.current_phase, EInvalidPhase);
+        assert!(should_be_phase <= PHASE_OPEN, EInvalidPhase);
+
+        let old_phase = rules.current_phase;
+        rules.current_phase = should_be_phase;
+
+        event::emit(PhaseChanged {
+            token_name: rules.token_name,
+            old_phase,
+            new_phase: should_be_phase,
+            timestamp: current_time,
+        });
+    }
+
+    /// Get current phase info
+    public fun get_phase(rules: &LaunchRules): u8 {
+        rules.current_phase
+    }
+
+    /// Get wallet's total purchases
+    public fun get_wallet_purchases(
+        registry: &WalletRegistry,
+        wallet: address
+    ): u64 {
+        if (table::contains(&registry.purchases, wallet)) {
+            *table::borrow(&registry.purchases, wallet)
+        } else {
+            0
+        }
+    }
+
+    /// Check if max buy reached for wallet
+    public fun has_reached_max(
+        rules: &LaunchRules,
+        registry: &WalletRegistry,
+        wallet: address
+    ): bool {
+        let purchased = get_wallet_purchases(registry, wallet);
+        purchased >= rules.max_buy_per_wallet
+    }
+}

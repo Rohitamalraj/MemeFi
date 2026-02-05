@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useLenis } from "lenis/react"
 import { Menu, X, Rocket, Shield, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { WalletButton } from "@/components/wallet-button"
 
 const linkVariants = {
   hidden: { opacity: 0, y: -10 },
@@ -137,9 +138,7 @@ export function Navigation() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5 }}
           >
-            <Button className="bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold">
-              Connect Wallet
-            </Button>
+            <WalletButton />
           </motion.div>
         </div>
 

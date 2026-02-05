@@ -2,9 +2,12 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Rocket, Info, Shield, Clock, Users, TrendingUp, CheckCircle, AlertCircle } from "lucide-react"
+import { Rocket, Info, Shield, Clock, Users, TrendingUp, CheckCircle, AlertCircle, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useTokenLaunch } from "@/lib/use-contracts"
+import { useWalletConnection } from "@/lib/use-wallet"
+import { getExplorerUrl } from "@/lib/contract-config"
 
 interface LaunchFormData {
   tokenName: string
@@ -33,8 +36,8 @@ const fadeUpVariants = {
 
 export function LaunchForm() {
   const [currentStep, setCurrentStep] = useState(1)
-  const [isLaunching, setIsLaunching] = useState(false)
-  const [launchSuccess, setLaunchSuccess] = useState(false)
+  const { launchToken, isLaunching, launchResult } = useTokenLaunch()
+  const { isConnected } = useWalletConnection()
   
   const [formData, setFormData] = useState<LaunchFormData>({
     tokenName: "",
@@ -53,11 +56,35 @@ export function LaunchForm() {
   }
 
   const handleLaunch = async () => {
-    setIsLaunching(true)
-    // Simulate launch process
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    setIsLaunching(false)
-    setLaunchSuccess(true)
+    console.log('🚀 Launch button clicked');
+    console.log('Form data:', formData);
+    
+    if (!isConnected) {
+      console.error('❌ Wallet not connected');
+      alert('Please connect your wallet first')
+      return
+    }
+
+    console.log('✅ Wallet connected, preparing transaction...');
+
+    const totalSupply = Number.parseInt(formData.totalSupply)
+    const maxBuyPerWallet = Number.parseInt(formData.maxBuyPerWallet)
+    const phaseDurationMs = Number.parseInt(formData.earlyPhaseDuration) * 60 * 60 * 1000 // Convert hours to milliseconds
+
+    const launchParams = {
+      name: formData.tokenName,
+      symbol: formData.tokenSymbol,
+      totalSupply,
+      maxBuyPerWallet,
+      phaseDurationMs,
+      transfersLocked: formData.restrictTransfers,
+    };
+
+    console.log('📋 Launch parameters:', launchParams);
+
+    const result = await launchToken(launchParams);
+    
+    console.log('🎯 Launch result:', result);
   }
 
   const steps = [
@@ -72,7 +99,7 @@ export function LaunchForm() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
       {/* Success State */}
-      {launchSuccess ? (
+      {launchResult ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -91,26 +118,21 @@ export function LaunchForm() {
             <p className="text-xl text-[#121212]/70 mb-2">
               <span className="font-bold text-[#AFFF00]">{formData.tokenSymbol}</span> is now live on Sui
             </p>
-            <p className="text-sm text-[#121212]/50">Transaction hash: 0x1234...5678</p>
+            <p className="text-sm text-[#121212]/50 font-mono">
+              Transaction: {launchResult.digest?.slice(0, 8)}...{launchResult.digest?.slice(-6)}
+            </p>
           </div>
           <div className="flex gap-4 justify-center">
-            <Button className="bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold rounded-full px-8">
-              View on Explorer
-            </Button>
+            {launchResult.explorerUrl && (
+              <a href={launchResult.explorerUrl} target="_blank" rel="noopener noreferrer">
+                <Button className="bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold rounded-full px-8">
+                  View on Explorer
+                  <ExternalLink className="w-4 h-4 ml-2" />
+                </Button>
+              </a>
+            )}
             <Button variant="outline" className="border-2 border-[#121212] rounded-full px-8" onClick={() => {
-              setLaunchSuccess(false)
-              setCurrentStep(1)
-              setFormData({
-                tokenName: "",
-                tokenSymbol: "",
-                totalSupply: "",
-                description: "",
-                imageUrl: "",
-                maxBuyPerWallet: "",
-                earlyPhaseDuration: "24",
-                sessionDuration: "6",
-                restrictTransfers: true,
-              })
+              window.location.reload()
             }}>
               Launch Another
             </Button>
@@ -457,7 +479,7 @@ export function LaunchForm() {
                         </Button>
                         <Button
                           onClick={handleLaunch}
-                          disabled={isLaunching}
+                          disabled={isLaunching || !isConnected}
                           className="flex-1 bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold py-6 rounded-full disabled:opacity-50 relative overflow-hidden group"
                         >
                           {isLaunching ? (
@@ -468,6 +490,11 @@ export function LaunchForm() {
                                 transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
                               />
                               <span className="relative z-10">Launching...</span>
+                            </>
+                          ) : !isConnected ? (
+                            <>
+                              <AlertCircle className="w-5 h-5 mr-2" />
+                              Connect Wallet First
                             </>
                           ) : (
                             <>

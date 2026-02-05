@@ -3,6 +3,8 @@ import type { Metadata, Viewport } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { LenisProvider } from "@/components/lenis-provider"
+import { Providers } from "@/components/providers"
+import { Toaster } from "@/components/ui/sonner"
 import ClickSpark from "@/components/click-spark"
 import "./globals.css"
 
@@ -34,16 +36,19 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        <ClickSpark
-          sparkColor="#AFFF00"
-          sparkSize={12}
-          sparkRadius={20}
-          sparkCount={8}
-          duration={400}
-          easing="ease-out"
-        >
-          <LenisProvider>{children}</LenisProvider>
-        </ClickSpark>
+        <Providers>
+          <ClickSpark
+            sparkColor="#AFFF00"
+            sparkSize={12}
+            sparkRadius={20}
+            sparkCount={8}
+            duration={400}
+            easing="ease-out"
+          >
+            <LenisProvider>{children}</LenisProvider>
+          </ClickSpark>
+          <Toaster />
+        </Providers>
         <Analytics />
       </body>
     </html>
