@@ -6,7 +6,7 @@ export const MEMEFI_CONFIG = {
   network: 'testnet', // 'devnet' | 'testnet' | 'mainnet'
   
   // Contract addresses (update after deployment)
-  packageId: '0x7fda7fce9169819cf03f884b023fac27ee8411ecddc45eba9686fbdcfccdd872',
+  packageId: '0xbc36f70235c2d954bfc5febc24ff97e08885e08547a23d3e7f4094340346f3ee',
   
   // Module names
   modules: {
@@ -40,16 +40,37 @@ export const CONTRACT_FUNCTIONS = {
   getWalletPurchases: 'get_wallet_purchases',
   
   // Session functions
-  createSession: 'create_session',
-  joinSession: 'join_session',
+  openSession: 'open_session',
   buyInSession: 'buy_in_session',
-  sellInSession: 'sell_in_session',
-  endSession: 'end_session',
   settleSession: 'settle_session',
+  createSession: 'create_session', // Legacy/alternative
+  joinSession: 'join_session',
   getBalance: 'get_balance',
   getSessionInfo: 'get_session_info',
   getIdentity: 'get_identity',
 };
+
+// Session states
+export const SESSION_STATES = {
+  ACTIVE: 0,
+  SETTLED: 1,
+} as const;
+
+// Token phases - 4-phase lifecycle
+export const TOKEN_PHASES = {
+  LAUNCH: 0,      // Fair-launch rules apply
+  PRIVATE: 1,     // Session-based private accumulation  
+  SETTLEMENT: 2,  // Sessions close, balances applied
+  OPEN: 3,        // Normal public token behavior
+} as const;
+
+// Phase labels for UI
+export const PHASE_LABELS = {
+  [TOKEN_PHASES.LAUNCH]: 'Launch',
+  [TOKEN_PHASES.PRIVATE]: 'Private',
+  [TOKEN_PHASES.SETTLEMENT]: 'Settlement',
+  [TOKEN_PHASES.OPEN]: 'Open',
+} as const;
 
 // Helper to get current RPC endpoint
 export function getRpcEndpoint(): string {
