@@ -2,10 +2,13 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Search, TrendingUp, TrendingDown, Clock, Shield, Eye, ArrowRight, Filter } from "lucide-react"
+import { Search, TrendingUp, TrendingDown, Clock, Shield, Eye, ArrowRight, Filter, Loader2, Plus } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { useTokens, useTradingSession } from "@/lib/use-contracts"
+import { MemeTokenData } from "@/lib/sui-client"
+import { TOKEN_PHASES, PHASE_LABELS } from "@/lib/contract-config"
 
 interface Token {
   id: string
@@ -17,91 +20,82 @@ interface Token {
   volume24h: number
   marketCap: number
   holders: number
-  phase: "early" | "public"
+  phase: "early" | "public" | "open"
+  phaseNumber: number // Actual phase from blockchain
   hasActiveSessions: boolean
   launchedAt: string
+  totalSupply: number
+  circulatingSupply: number
 }
 
-const mockTokens: Token[] = [
-  {
-    id: "1",
-    name: "Pepe Moon",
-    symbol: "PEPE",
-    price: 0.00032,
-    priceChange24h: 15.4,
-    volume24h: 125000,
-    marketCap: 3200000,
-    holders: 1247,
-    phase: "early",
-    hasActiveSessions: true,
-    launchedAt: "2h ago",
-  },
-  {
-    id: "2",
-    name: "Doge King",
-    symbol: "DKING",
-    price: 0.00018,
-    priceChange24h: 23.7,
-    volume24h: 456000,
-    marketCap: 1800000,
-    holders: 2134,
-    phase: "early",
-    hasActiveSessions: true,
-    launchedAt: "5h ago",
-  },
-  {
-    id: "3",
-    name: "Shiba Rocket",
-    symbol: "SROCKET",
-    price: 0.00045,
-    priceChange24h: -5.2,
-    volume24h: 984000,
-    marketCap: 4500000,
-    holders: 3421,
-    phase: "public",
-    hasActiveSessions: false,
-    launchedAt: "2d ago",
-  },
-  {
-    id: "4",
-    name: "Moon Cat",
-    symbol: "MCAT",
-    price: 0.00012,
-    priceChange24h: 8.9,
-    volume24h: 32000,
-    marketCap: 1200000,
-    holders: 567,
-    phase: "early",
-    hasActiveSessions: true,
-    launchedAt: "1h ago",
-  },
-  {
-    id: "5",
-    name: "Sui Pepe",
-    symbol: "SUIPE",
-    price: 0.00067,
-    priceChange24h: 45.2,
-    volume24h: 1250000,
-    marketCap: 6700000,
-    holders: 4521,
-    phase: "public",
-    hasActiveSessions: false,
-    launchedAt: "1w ago",
-  },
-  {
-    id: "6",
-    name: "Floki Sui",
-    symbol: "FLOKIS",
-    price: 0.00021,
-    priceChange24h: -12.3,
-    volume24h: 234000,
-    marketCap: 2100000,
-    holders: 1876,
-    phase: "public",
-    hasActiveSessions: false,
-    launchedAt: "3d ago",
-  },
-]
+// Helper to convert blockchain phase number to readable phase
+function getPhaseLabel(phaseNumber: number): "early" | "public" | "open" {
+  if (phaseNumber === 0) return "early"   // PHASE_LAUNCH
+  if (phaseNumber === 1) return "early"   // PHASE_PRIVATE (still early)
+  if (phaseNumber === 2) return "public"  // PHASE_SETTLEMENT
+  return "open" // PHASE_OPEN
+}
+
+// Helper to format timestamp to relative time
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now()
+  
+  // Sui timestamps are in milliseconds, but verify
+  // If timestamp is suspiciously small (< year 2000 in ms), it might be in seconds
+  let timestampMs = timestamp
+  if (timestamp < 946684800000) { // Jan 1, 2000 in milliseconds
+    timestampMs = timestamp * 1000 // Convert seconds to milliseconds
+  }
+  
+  const diff = now - timestampMs
+  
+  console.log('⏰ Timestamp debug:', { 
+    raw: timestamp, 
+    converted: timestampMs, 
+    now, 
+    diff, 
+    diffMinutes: Math.floor(diff / 60000) 
+  })
+  
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  const weeks = Math.floor(days / 7)
+  
+  if (weeks > 0) return `${weeks}w ago`
+  if (days > 0) return `${days}d ago`
+  if (hours > 0) return `${hours}h ago`
+  if (minutes > 0) return `${minutes}m ago`
+  if (seconds > 0) return `${seconds}s ago`
+  return "just now"
+}
+
+// Convert blockchain token data to display format
+function convertToDisplayToken(tokenData: MemeTokenData): Token {
+  const phase = getPhaseLabel(tokenData.currentPhase)
+  const supplyPercent = tokenData.totalSupply > 0 
+    ? (tokenData.circulatingSupply / tokenData.totalSupply) * 100 
+    : 0
+  
+  return {
+    id: tokenData.id,
+    name: tokenData.name,
+    symbol: tokenData.symbol,
+    // Placeholder values - will be calculated from actual trading data later
+    price: 0.00001, // Base price
+    priceChange24h: 0,
+    volume24h: 0,
+    marketCap: tokenData.totalSupply * 0.00001, // totalSupply * base price
+    holders: 0, // Will need to query from balances
+    phase,
+    phaseNumber: tokenData.currentPhase, // Keep actual phase number
+    hasActiveSessions: false, // Will need to query active sessions
+    launchedAt: formatRelativeTime(tokenData.launchTime),
+    totalSupply: tokenData.totalSupply,
+    circulatingSupply: tokenData.circulatingSupply,
+  }
+}
 
 function TokenCard({ token }: { token: Token }) {
   return (
@@ -122,14 +116,19 @@ function TokenCard({ token }: { token: Token }) {
                 </div>
               </div>
               <div className="flex flex-col items-end gap-2">
-                <div
-                  className={`px-2 py-1 rounded-full text-xs font-bold ${
-                    token.phase === "early"
-                      ? "bg-[#AFFF00]/20 text-[#7AB800] border border-[#AFFF00]/50"
-                      : "bg-gray-100 text-gray-700"
-                  }`}
-                >
-                  {token.phase === "early" ? "EARLY" : "PUBLIC"}
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`px-2 py-1 rounded-full text-xs font-bold ${
+                      token.phase === "early"
+                        ? "bg-[#AFFF00]/20 text-[#7AB800] border border-[#AFFF00]/50"
+                        : "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {token.phase === "early" ? "EARLY" : "PUBLIC"}
+                  </div>
+                  <div className="text-xs text-[#121212]/40 font-mono">
+                    Phase {token.phaseNumber}
+                  </div>
                 </div>
                 {token.hasActiveSessions && (
                   <div className="flex items-center gap-1 text-xs text-[#AFFF00]">
@@ -192,11 +191,17 @@ function TokenCard({ token }: { token: Token }) {
 }
 
 export function TokensPage() {
-  const [sortBy, setSortBy] = useState<"trending" | "new" | "volume">("trending")
-  const [filterPhase, setFilterPhase] = useState<"all" | "early" | "public">("all")
+  const [sortBy, setSortBy] = useState<"trending" | "new" | "volume">("new")
+  const [filterPhase, setFilterPhase] = useState<"all" | "early" | "public" | "open">("all")
   const [searchQuery, setSearchQuery] = useState("")
+  
+  // Fetch tokens from blockchain
+  const { tokens: blockchainTokens, isLoading, error, refetch } = useTokens()
+  
+  // Convert blockchain tokens to display format
+  const displayTokens = blockchainTokens.map(convertToDisplayToken)
 
-  const filteredTokens = mockTokens
+  const filteredTokens = displayTokens
     .filter(token => {
       const matchesPhase = filterPhase === "all" || token.phase === filterPhase
       const matchesSearch =
@@ -207,7 +212,8 @@ export function TokensPage() {
     .sort((a, b) => {
       if (sortBy === "trending") return b.priceChange24h - a.priceChange24h
       if (sortBy === "volume") return b.volume24h - a.volume24h
-      return 0 // new
+      // For "new", sort by launch time (most recent first)
+      return 0 // Already in descending order from events query
     })
 
   return (
@@ -269,7 +275,7 @@ export function TokensPage() {
             <div className="h-6 w-px bg-[#121212]/20" />
             <div className="flex gap-2">
               <span className="text-sm font-bold text-[#121212]/60 flex items-center">Phase:</span>
-              {(["all", "early", "public"] as const).map((phase) => (
+              {(["all", "early", "public", "open"] as const).map((phase) => (
                 <Button
                   key={phase}
                   onClick={() => setFilterPhase(phase)}
@@ -290,35 +296,77 @@ export function TokensPage() {
           </div>
         </motion.div>
 
-        {/* Tokens Grid */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
-        >
-          {filteredTokens.map((token, index) => (
-            <motion.div
-              key={token.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 * index }}
+        {/* Loading State */}
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center justify-center py-20"
+          >
+            <Loader2 className="w-12 h-12 text-[#AFFF00] animate-spin mb-4" />
+            <p className="text-[#121212]/60 text-lg">Loading tokens from blockchain...</p>
+          </motion.div>
+        )}
+
+        {/* Error State */}
+        {error && !isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-20"
+          >
+            <div className="text-6xl mb-4">⚠️</div>
+            <h3 className="text-2xl font-bold text-[#121212] mb-2">Failed to load tokens</h3>
+            <p className="text-[#121212]/60 mb-6">{error}</p>
+            <Button 
+              onClick={refetch}
+              className="bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold rounded-full px-8"
             >
-              <TokenCard token={token} />
-            </motion.div>
-          ))}
-        </motion.div>
+              Try Again
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Tokens Grid */}
+        {!isLoading && !error && filteredTokens.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {filteredTokens.map((token, index) => (
+              <motion.div
+                key={token.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 * index }}
+              >
+                <TokenCard 
+                  key={token.id}
+                  token={token}
+                />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
 
         {/* Empty State */}
-        {filteredTokens.length === 0 && (
+        {!isLoading && !error && filteredTokens.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="text-center py-20"
           >
             <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-2xl font-bold text-[#121212] mb-2">No tokens found</h3>
-            <p className="text-[#121212]/60 mb-6">Try adjusting your search or filters</p>
+            <h3 className="text-2xl font-bold text-[#121212] mb-2">
+              {displayTokens.length === 0 ? "No tokens launched yet" : "No tokens found"}
+            </h3>
+            <p className="text-[#121212]/60 mb-6">
+              {displayTokens.length === 0 
+                ? "Be the first to launch a token on MemeFi!" 
+                : "Try adjusting your search or filters"}
+            </p>
             <Link href="/launch">
               <Button className="bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold rounded-full px-8">
                 Launch Your Token
