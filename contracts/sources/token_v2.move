@@ -4,6 +4,7 @@
 module memefi::token_v2 {
     use sui::table::{Self, Table};
     use sui::event;
+    use sui::clock::{Self, Clock};
     use std::string::{Self, String};
 
     /// Errors
@@ -12,10 +13,11 @@ module memefi::token_v2 {
     const EInsufficientBalance: u64 = 3;
     const EInvalidPhase: u64 = 4;
 
-    /// Launch phases
-    const PHASE_LAUNCH: u8 = 0;
-    const PHASE_PUBLIC: u8 = 1;
-    const PHASE_OPEN: u8 = 2;
+    /// Launch phases - 4-phase lifecycle
+    const PHASE_LAUNCH: u8 = 0;      // Fair-launch rules apply
+    const PHASE_PRIVATE: u8 = 1;     // Session-based private accumulation
+    const PHASE_SETTLEMENT: u8 = 2;  // Sessions close, balances applied
+    const PHASE_OPEN: u8 = 3;        // Normal public token behavior
 
     /// A MemeToken with embedded launch rules
     public struct MemeToken has key, store {
@@ -69,6 +71,7 @@ module memefi::token_v2 {
 
     /// Launch a new token
     public entry fun launch_token(
+        clock: &Clock,
         name: vector<u8>,
         symbol: vector<u8>,
         decimals: u8,
@@ -79,7 +82,7 @@ module memefi::token_v2 {
         ctx: &mut TxContext
     ) {
         let creator = tx_context::sender(ctx);
-        let launch_time = tx_context::epoch_timestamp_ms(ctx);
+        let launch_time = clock::timestamp_ms(clock);
         
         let uid = object::new(ctx);
         let token_id = object::uid_to_inner(&uid);
@@ -116,12 +119,13 @@ module memefi::token_v2 {
 
     /// Buy tokens - enforces max buy rules and phase restrictions
     public entry fun buy_tokens(
+        clock: &Clock,
         token: &mut MemeToken,
         amount: u64,
         ctx: &mut TxContext
     ) {
         let buyer = tx_context::sender(ctx);
-        let current_time = tx_context::epoch_timestamp_ms(ctx);
+        let current_time = clock::timestamp_ms(clock);
 
         // Update phase if needed
         update_phase_internal(token, current_time);
@@ -129,8 +133,8 @@ module memefi::token_v2 {
         // Check if we have enough supply
         assert!(token.circulating_supply + amount <= token.total_supply, EInsufficientBalance);
 
-        // Check max buy limit during launch and public phases
-        if (token.current_phase != PHASE_OPEN) {
+        // Check max buy limit during launch, private, and settlement phases
+        if (token.current_phase < PHASE_OPEN) {
             let current_purchased = if (table::contains(&token.purchases, buyer)) {
                 *table::borrow(&token.purchases, buyer)
             } else {
@@ -214,10 +218,11 @@ module memefi::token_v2 {
 
     /// Manually advance phase (can be called by anyone)
     public entry fun advance_phase(
+        clock: &Clock,
         token: &mut MemeToken,
         ctx: &mut TxContext
     ) {
-        let current_time = tx_context::epoch_timestamp_ms(ctx);
+        let current_time = clock::timestamp_ms(clock);
         update_phase_internal(token, current_time);
     }
 
@@ -226,10 +231,13 @@ module memefi::token_v2 {
         let time_elapsed = current_time - token.launch_time;
         let phase_duration = token.phase_duration_ms;
 
+        // 4-phase system with equal time periods
         let should_be_phase = if (time_elapsed < phase_duration) {
             PHASE_LAUNCH
         } else if (time_elapsed < phase_duration * 2) {
-            PHASE_PUBLIC
+            PHASE_PRIVATE
+        } else if (time_elapsed < phase_duration * 3) {
+            PHASE_SETTLEMENT
         } else {
             PHASE_OPEN
         };
