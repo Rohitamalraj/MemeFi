@@ -69,7 +69,9 @@ export function LaunchForm() {
 
     const totalSupply = Number.parseInt(formData.totalSupply)
     const maxBuyPerWallet = Number.parseInt(formData.maxBuyPerWallet)
-    const phaseDurationMs = Number.parseInt(formData.earlyPhaseDuration) * 60 * 60 * 1000 // Convert hours to milliseconds
+    // Use session duration as the base - all phases will be this length
+    // Use parseFloat to handle decimal hours like 0.05
+    const phaseDurationMs = Math.floor(parseFloat(formData.sessionDuration) * 60 * 60 * 1000) // Convert hours to milliseconds
 
     const launchParams = {
       name: formData.tokenName,
@@ -94,7 +96,7 @@ export function LaunchForm() {
   ]
 
   const isStep1Valid = formData.tokenName && formData.tokenSymbol && formData.totalSupply
-  const isStep2Valid = formData.maxBuyPerWallet && formData.earlyPhaseDuration
+  const isStep2Valid = formData.maxBuyPerWallet && formData.sessionDuration
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -349,14 +351,14 @@ export function LaunchForm() {
 
                       <div>
                         <label className="block text-sm font-bold text-[#121212] mb-2">
-                          Private Session Duration
+                          Phase Duration (Used for All Phases) *
                         </label>
                         <div className="relative">
                           <input
                             type="text"
                             value={formData.sessionDuration}
                             onChange={(e) => handleInputChange("sessionDuration", e.target.value)}
-                            placeholder="6"
+                            placeholder="0.05"
                             className="w-full px-4 py-3 border-2 border-[#121212]/20 rounded-xl focus:border-[#AFFF00] focus:outline-none transition-colors pr-24"
                           />
                           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#121212]/50 font-medium">
@@ -364,7 +366,7 @@ export function LaunchForm() {
                           </span>
                         </div>
                         <p className="text-xs text-[#121212]/50 mt-1">
-                          Duration of privacy-protected trading session
+                          All 4 phases have equal duration. Token shows on Sessions page during Phase 2 (PRIVATE). Example: 0.05 = 3 min per phase.
                         </p>
                       </div>
 
