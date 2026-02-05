@@ -41,9 +41,11 @@ export function createTokenTransaction(params: CreateTokenParams): TransactionBl
     symbolBytes,
   });
   
+  // Clock object is a shared object at address 0x6
   txb.moveCall({
     target: getFunctionName('token', CONTRACT_FUNCTIONS.createToken),
     arguments: [
+      txb.object('0x6'), // Clock
       txb.pure(nameBytes, 'vector<u8>'),
       txb.pure(symbolBytes, 'vector<u8>'),
       txb.pure(decimals, 'u8'),
@@ -55,6 +57,25 @@ export function createTokenTransaction(params: CreateTokenParams): TransactionBl
   });
   
   console.log('Transaction block created:', txb);
+  
+  return txb;
+}
+
+// Advance Phase Transaction
+export interface AdvancePhaseParams {
+  tokenId: string;
+}
+
+export function advancePhaseTransaction(params: AdvancePhaseParams): TransactionBlock {
+  const txb = new TransactionBlock();
+  
+  txb.moveCall({
+    target: getFunctionName('token', CONTRACT_FUNCTIONS.advancePhase),
+    arguments: [
+      txb.object('0x6'), // Clock
+      txb.object(params.tokenId),
+    ],
+  });
   
   return txb;
 }
@@ -75,116 +96,6 @@ export function buyTokensTransaction(params: BuyTokensParams): TransactionBlock 
       txb.object(params.rulesObjectId),
       txb.object(params.registryObjectId),
       txb.pure(params.amount),
-    ],
-  });
-  
-  return txb;
-}
-
-// Create Session Transaction
-export interface CreateSessionParams {
-  name: string;
-  tokenName: string;
-  durationMs: number;
-  tokenType: string; // Full type with package ID
-}
-
-export function createSessionTransaction(params: CreateSessionParams): TransactionBlock {
-  const txb = new TransactionBlock();
-  
-  txb.moveCall({
-    target: getFunctionName('session', CONTRACT_FUNCTIONS.createSession),
-    typeArguments: [params.tokenType],
-    arguments: [
-      txb.pure(params.name),
-      txb.pure(params.tokenName),
-      txb.pure(params.durationMs),
-    ],
-  });
-  
-  return txb;
-}
-
-// Join Session Transaction
-export interface JoinSessionParams {
-  sessionId: string;
-  ensIdentity: string;
-  tokenType: string;
-}
-
-export function joinSessionTransaction(params: JoinSessionParams): TransactionBlock {
-  const txb = new TransactionBlock();
-  
-  txb.moveCall({
-    target: getFunctionName('session', CONTRACT_FUNCTIONS.joinSession),
-    typeArguments: [params.tokenType],
-    arguments: [
-      txb.object(params.sessionId),
-      txb.pure(params.ensIdentity),
-    ],
-  });
-  
-  return txb;
-}
-
-// Buy in Session Transaction
-export interface BuyInSessionParams {
-  sessionId: string;
-  amount: number;
-  tokenType: string;
-}
-
-export function buyInSessionTransaction(params: BuyInSessionParams): TransactionBlock {
-  const txb = new TransactionBlock();
-  
-  txb.moveCall({
-    target: getFunctionName('session', CONTRACT_FUNCTIONS.buyInSession),
-    typeArguments: [params.tokenType],
-    arguments: [
-      txb.object(params.sessionId),
-      txb.pure(params.amount),
-    ],
-  });
-  
-  return txb;
-}
-
-// Sell in Session Transaction
-export interface SellInSessionParams {
-  sessionId: string;
-  amount: number;
-  tokenType: string;
-}
-
-export function sellInSessionTransaction(params: SellInSessionParams): TransactionBlock {
-  const txb = new TransactionBlock();
-  
-  txb.moveCall({
-    target: getFunctionName('session', CONTRACT_FUNCTIONS.sellInSession),
-    typeArguments: [params.tokenType],
-    arguments: [
-      txb.object(params.sessionId),
-      txb.pure(params.amount),
-    ],
-  });
-  
-  return txb;
-}
-
-// Settle Session Transaction
-export interface SettleSessionParams {
-  sessionId: string;
-  tokenType: string;
-}
-
-export function settleSessionTransaction(params: SettleSessionParams): TransactionBlock {
-  const txb = new TransactionBlock();
-  
-  txb.moveCall({
-    target: getFunctionName('session', CONTRACT_FUNCTIONS.settleSession),
-    typeArguments: [params.tokenType],
-    arguments: [
-      txb.object(params.sessionId),
     ],
   });
   
@@ -225,6 +136,409 @@ export async function getSessionInfo(sessionId: string) {
     return object.data;
   } catch (error) {
     console.error('Failed to fetch session info:', error);
+    return null;
+  }
+}
+
+// Fetch all MemeToken objects from blockchain
+export interface MemeTokenData {
+  id: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  totalSupply: number;
+  circulatingSupply: number;
+  maxBuyPerWallet: number;
+  phaseDurationMs: number;
+  transfersLocked: boolean;
+  currentPhase: number;
+  launchTime: number;
+  creator: string;
+}
+
+// Helper to calculate actual current phase based on time
+export function calculateCurrentPhase(launchTime: number, phaseDurationMs: number): number {
+  const now = Date.now();
+  const timeElapsed = now - launchTime;
+  
+  if (timeElapsed < phaseDurationMs) {
+    return 0; // PHASE_LAUNCH
+  } else if (timeElapsed < phaseDurationMs * 2) {
+    return 1; // PHASE_PRIVATE
+  } else if (timeElapsed < phaseDurationMs * 3) {
+    return 2; // PHASE_SETTLEMENT
+  } else {
+    return 3; // PHASE_OPEN
+  }
+}
+
+export async function getAllTokens(): Promise<MemeTokenData[]> {
+  const client = getSuiClient();
+  
+  try {
+    // Query all objects of type MemeToken
+    const objectType = `${MEMEFI_CONFIG.packageId}::${MEMEFI_CONFIG.modules.token}::MemeToken`;
+    
+    console.log('Querying tokens of type:', objectType);
+    
+    const response = await client.getOwnedObjects({
+      filter: {
+        StructType: objectType,
+      },
+      options: {
+        showContent: true,
+        showType: true,
+      },
+    });
+    
+    console.log('Query response:', response);
+    
+    const tokens: MemeTokenData[] = [];
+    
+    for (const item of response.data) {
+      if (item.data && item.data.content && item.data.content.dataType === 'moveObject') {
+        const fields = item.data.content.fields as any;
+        
+        tokens.push({
+          id: item.data.objectId,
+          name: fields.name || '',
+          symbol: fields.symbol || '',
+          decimals: Number(fields.decimals || 9),
+          totalSupply: Number(fields.total_supply || 0),
+          circulatingSupply: Number(fields.circulating_supply || 0),
+          maxBuyPerWallet: Number(fields.max_buy_per_wallet || 0),
+          phaseDurationMs: Number(fields.phase_duration_ms || 0),
+          transfersLocked: Boolean(fields.transfers_locked),
+          currentPhase: Number(fields.current_phase || 0),
+          launchTime: Number(fields.launch_time || 0),
+          creator: fields.creator || '',
+        });
+        
+        console.log('🪙 Token parsed:', {
+          name: fields.name,
+          launchTime: fields.launch_time,
+          launchTimeNumber: Number(fields.launch_time || 0),
+          currentPhase: fields.current_phase,
+        });
+      }
+    }
+    
+    console.log('Fetched tokens:', tokens);
+    
+    return tokens;
+  } catch (error) {
+    console.error('Failed to fetch tokens:', error);
+    return [];
+  }
+}
+
+// Alternative method using getObject for shared objects
+export async function getTokenById(tokenId: string): Promise<MemeTokenData | null> {
+  const client = getSuiClient();
+  
+  try {
+    const object = await client.getObject({
+      id: tokenId,
+      options: { 
+        showContent: true,
+        showType: true,
+      },
+    });
+    
+    if (!object.data || !object.data.content || object.data.content.dataType !== 'moveObject') {
+      return null;
+    }
+    
+    const fields = object.data.content.fields as any;
+    
+    return {
+      id: object.data.objectId,
+      name: fields.name || '',
+      symbol: fields.symbol || '',
+      decimals: Number(fields.decimals || 9),
+      totalSupply: Number(fields.total_supply || 0),
+      circulatingSupply: Number(fields.circulating_supply || 0),
+      maxBuyPerWallet: Number(fields.max_buy_per_wallet || 0),
+      phaseDurationMs: Number(fields.phase_duration_ms || 0),
+      transfersLocked: Boolean(fields.transfers_locked),
+      currentPhase: Number(fields.current_phase || 0),
+      launchTime: Number(fields.launch_time || 0),
+      creator: fields.creator || '',
+    };
+  } catch (error) {
+    console.error('Failed to fetch token:', error);
+    return null;
+  }
+}
+
+// Query all TokenLaunched events to find tokens
+export async function getAllTokensFromEvents(): Promise<MemeTokenData[]> {
+  const client = getSuiClient();
+  
+  try {
+    // Query TokenLaunched events
+    const eventType = `${MEMEFI_CONFIG.packageId}::${MEMEFI_CONFIG.modules.token}::TokenLaunched`;
+    
+    console.log('Querying events of type:', eventType);
+    
+    const events = await client.queryEvents({
+      query: {
+        MoveEventType: eventType,
+      },
+      order: 'descending',
+    });
+    
+    console.log('Events found:', events);
+    
+    const tokens: MemeTokenData[] = [];
+    
+    // For each event, fetch the actual token object
+    for (const event of events.data) {
+      const parsedJson = event.parsedJson as any;
+      const tokenId = parsedJson.token_id;
+      
+      if (tokenId) {
+        const token = await getTokenById(tokenId);
+        if (token) {
+          tokens.push(token);
+        }
+      }
+    }
+    
+    return tokens;
+  } catch (error) {
+    console.error('Failed to fetch tokens from events:', error);
+    return [];
+  }
+}
+
+// ==================== SESSION FUNCTIONS ====================
+
+export interface TradingSessionData {
+  id: string;
+  owner: address;
+  state: number; // 0 = ACTIVE, 1 = SETTLED
+  tokenId: string;
+  balance: number;
+  createdAt: number;
+  // Additional fields from shared session model
+  sessionName?: string;
+  tokenName?: string;
+  creator?: address;
+  startTime?: number;
+  endTime?: number;
+  participants?: address[];
+  volume?: number;
+}
+
+// Open a new session for a token
+export interface OpenSessionParams {
+  tokenId: string;
+}
+
+export function openSessionTransaction(params: OpenSessionParams): TransactionBlock {
+  const txb = new TransactionBlock();
+  
+  txb.moveCall({
+    target: getFunctionName('session', CONTRACT_FUNCTIONS.openSession),
+    arguments: [
+      txb.object('0x6'), // Clock object
+      txb.object(params.tokenId),
+    ],
+  });
+  
+  return txb;
+}
+
+// Buy tokens within a session
+export interface BuyInSessionTransactionParams {
+  sessionId: string;
+  tokenId: string;
+  amount: number;
+}
+
+export function buyInSessionTransaction(params: BuyInSessionTransactionParams): TransactionBlock {
+  const txb = new TransactionBlock();
+  
+  txb.moveCall({
+    target: getFunctionName('session', CONTRACT_FUNCTIONS.buyInSession),
+    arguments: [
+      txb.object('0x6'), // Clock object
+      txb.object(params.sessionId),
+      txb.object(params.tokenId),
+      txb.pure(params.amount, 'u64'),
+    ],
+  });
+  
+  return txb;
+}
+
+// Settle a session
+export interface SettleSessionTransactionParams {
+  sessionId: string;
+  tokenId: string;
+}
+
+export function settleSessionTransaction(params: SettleSessionTransactionParams): TransactionBlock {
+  const txb = new TransactionBlock();
+  
+  txb.moveCall({
+    target: getFunctionName('session', CONTRACT_FUNCTIONS.settleSession),
+    arguments: [
+      txb.object(params.sessionId),
+      txb.object(params.tokenId),
+    ],
+  });
+  
+  return txb;
+}
+
+// Query all sessions for a specific wallet
+export async function getSessionsForWallet(walletAddress: string): Promise<TradingSessionData[]> {
+  const client = getSuiClient();
+  
+  try {
+    // Query objects owned by wallet that are TradingSession type
+    const sessionType = `${MEMEFI_CONFIG.packageId}::session::TradingSession`;
+    
+    console.log('🔍 Querying sessions for wallet:', walletAddress);
+    console.log('🔍 Looking for type:', sessionType);
+    
+    const response = await client.getOwnedObjects({
+      owner: walletAddress,
+      filter: {
+        StructType: sessionType,
+      },
+      options: {
+        showContent: true,
+        showType: true,
+      },
+    });
+    
+    console.log(`✅ Found ${response.data.length} session objects for wallet:`, response);
+    
+    const sessions: TradingSessionData[] = [];
+    
+    for (const item of response.data) {
+      if (item.data && item.data.content && item.data.content.dataType === 'moveObject') {
+        const fields = item.data.content.fields as any;
+        
+        sessions.push({
+          id: item.data.objectId,
+          owner: fields.owner || walletAddress,
+          state: Number(fields.state || 0),
+          tokenId: fields.token_id || '',
+          balance: Number(fields.balance || 0),
+          createdAt: Number(fields.created_at || 0),
+        });
+      }
+    }
+    
+    console.log(`📊 Parsed ${sessions.length} sessions from wallet`);
+    
+    return sessions;
+  } catch (error) {
+    console.error('❌ Failed to fetch sessions for wallet:', error);
+    return [];
+  }
+}
+
+// Query all active sessions from events
+export async function getAllSessionsFromEvents(): Promise<TradingSessionData[]> {
+  const client = getSuiClient();
+  
+  try {
+    // Try multiple event types to find sessions
+    const eventTypes = [
+      `${MEMEFI_CONFIG.packageId}::session::SessionCreated`,
+      `${MEMEFI_CONFIG.packageId}::session::SessionOpened`,
+      `${MEMEFI_CONFIG.packageId}::token_v2::SessionCreated`,
+    ];
+    
+    let allEvents: any[] = [];
+    
+    for (const eventType of eventTypes) {
+      try {
+        console.log('🔍 Querying session events of type:', eventType);
+        
+        const events = await client.queryEvents({
+          query: {
+            MoveEventType: eventType,
+          },
+          order: 'descending',
+        });
+        
+        console.log(`✅ Found ${events.data.length} events for ${eventType}:`, events);
+        allEvents = [...allEvents, ...events.data];
+      } catch (err) {
+        console.log(`⚠️ No events found for type ${eventType}:`, err);
+      }
+    }
+    
+    if (allEvents.length === 0) {
+      console.log('ℹ️ No session events found. Sessions may not be deployed or created yet.');
+      return [];
+    }
+    
+    const sessions: TradingSessionData[] = [];
+    
+    // For each event, fetch the actual session object
+    for (const event of allEvents) {
+      const parsedJson = event.parsedJson as any;
+      const sessionId = parsedJson.session_id;
+      
+      if (sessionId) {
+        const session = await getSessionById(sessionId);
+        if (session) {
+          sessions.push(session);
+        }
+      }
+    }
+    
+    console.log(`📊 Total sessions retrieved: ${sessions.length}`);
+    return sessions;
+  } catch (error) {
+    console.error('❌ Failed to fetch sessions from events:', error);
+    return [];
+  }
+}
+
+// Get a specific session by ID
+export async function getSessionById(sessionId: string): Promise<TradingSessionData | null> {
+  const client = getSuiClient();
+  
+  try {
+    const object = await client.getObject({
+      id: sessionId,
+      options: { 
+        showContent: true,
+        showType: true,
+      },
+    });
+    
+    if (!object.data || !object.data.content || object.data.content.dataType !== 'moveObject') {
+      return null;
+    }
+    
+    const fields = object.data.content.fields as any;
+    
+    return {
+      id: object.data.objectId,
+      owner: fields.owner || fields.creator || '',
+      state: Number(fields.state || 0),
+      tokenId: fields.token_id || '',
+      balance: Number(fields.balance || 0),
+      createdAt: Number(fields.created_at || fields.start_time || 0),
+      sessionName: fields.session_name || '',
+      tokenName: fields.token_name || '',
+      creator: fields.creator || '',
+      startTime: Number(fields.start_time || 0),
+      endTime: Number(fields.end_time || 0),
+      participants: fields.participants || [],
+      volume: Number(fields.volume || 0),
+    };
+  } catch (error) {
+    console.error('Failed to fetch session:', error);
     return null;
   }
 }
