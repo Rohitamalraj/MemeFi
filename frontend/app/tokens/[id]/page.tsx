@@ -32,14 +32,18 @@ function formatTimeRemaining(seconds: number): string {
   return `${secs}s`
 }
 
-function calculateCurrentPhase(launchTime: number, phaseDurationMs: number): number {
+function calculateCurrentPhase(
+  launchTime: number, 
+  earlyPhaseDurationMs: number, 
+  phaseDurationMs: number
+): number {
   const now = Date.now()
   const elapsed = now - launchTime
   
-  if (elapsed < phaseDurationMs) return 0 // LAUNCH
-  if (elapsed < phaseDurationMs * 2) return 1 // PRIVATE
-  if (elapsed < phaseDurationMs * 3) return 2 // SETTLEMENT
-  return 3 // OPEN
+  // 3-phase system: LAUNCH → PRIVATE → OPEN (instant settlement)
+  if (elapsed < earlyPhaseDurationMs) return 0 // LAUNCH
+  if (elapsed < earlyPhaseDurationMs + phaseDurationMs) return 1 // PRIVATE
+  return 3 // OPEN (instant settlement, skip phase 2)
 }
 
 export default function TokenTradingPage() {
@@ -82,8 +86,21 @@ export default function TokenTradingPage() {
     if (!token) return
     
     const updateTimer = () => {
-      const currentPhase = calculateCurrentPhase(token.launchTime, token.phaseDurationMs)
-      const phaseEndTime = token.launchTime + (token.phaseDurationMs * (currentPhase + 1))
+      const currentPhase = calculateCurrentPhase(token.launchTime, token.earlyPhaseDurationMs, token.phaseDurationMs)
+      
+      // Calculate phase end time for 3-phase system (no SETTLEMENT)
+      let phaseEndTime: number
+      if (currentPhase === 0) {
+        // LAUNCH phase ends after early phase duration
+        phaseEndTime = token.launchTime + token.earlyPhaseDurationMs
+      } else if (currentPhase === 1) {
+        // PRIVATE phase ends after early + phase duration (then instant settlement to OPEN)
+        phaseEndTime = token.launchTime + token.earlyPhaseDurationMs + token.phaseDurationMs
+      } else {
+        // OPEN phase has no end
+        phaseEndTime = Date.now()
+      }
+      
       const remaining = Math.max(0, Math.floor((phaseEndTime - Date.now()) / 1000))
       setTimeRemaining(remaining)
     }
@@ -183,7 +200,7 @@ export default function TokenTradingPage() {
     )
   }
 
-  const currentPhase = calculateCurrentPhase(token.launchTime, token.phaseDurationMs)
+  const currentPhase = calculateCurrentPhase(token.launchTime, token.earlyPhaseDurationMs, token.phaseDurationMs)
   const supplyPercent = token.totalSupply > 0 
     ? ((token.circulatingSupply / token.totalSupply) * 100).toFixed(1)
     : '0'
@@ -237,9 +254,54 @@ export default function TokenTradingPage() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left Column - Stats */}
           <div className="lg:col-span-1 space-y-4">
+            {/* Market Stats Card */}
+            <Card className="border-2 bg-gradient-to-br from-[#AFFF00]/10 to-white">
+              <CardContent className="pt-6">
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-[#AFFF00]" />
+                  Market Stats
+                </h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-sm text-[#121212]/60 mb-1">Market Cap</div>
+                    <div className="font-black text-2xl text-[#AFFF00]">
+                      ${formatNumber(token.marketCap)}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-sm text-[#121212]/60 mb-1">Current Price</div>
+                    <div className="font-bold text-xl">
+                      ${token.currentPrice.toFixed(6)} SOL
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm text-[#121212]/60 mb-1 flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        Holders
+                      </div>
+                      <div className="font-bold text-xl">{token.holderCount}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-[#121212]/60 mb-1 flex items-center gap-1">
+                        <Activity className="w-3 h-3" />
+                        Volume
+                      </div>
+                      <div className="font-bold text-xl">{formatNumber(token.totalVolume)}</div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Token Info Card */}
             <Card className="border-2">
               <CardContent className="pt-6">
-                <h3 className="font-bold text-lg mb-4">Token Stats</h3>
+                <h3 className="font-bold text-lg mb-4">Token Info</h3>
                 
                 <div className="space-y-4">
                   <div>
@@ -392,21 +454,61 @@ export default function TokenTradingPage() {
                   {/* Trade Button */}
                   <Button
                     onClick={handleTrade}
-                    disabled={!address || !amount || parseFloat(amount) <= 0 || isTrading}
-                    className="w-full bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold text-lg py-6"
+                    disabled={!address || !amount || parseFloat(amount) <= 0 || isTrading || currentPhase === 0}
+                    className="w-full bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold text-lg py-6 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {!address
                       ? 'Connect Wallet'
+                      : currentPhase === 0
+                      ? 'Trading Starts in Private Phase'
                       : isTrading
                       ? 'Processing...'
                       : `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${token.symbol}`}
                   </Button>
 
-                  {/* Warning for non-OPEN phase */}
-                  {currentPhase < 3 && (
-                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                      <strong>Note:</strong> This token is in {PHASE_LABELS[currentPhase]} phase. 
-                      Max buy limit: {formatNumber(token.maxBuyPerWallet)} tokens per wallet.
+                  {/* Phase 0 (LAUNCH) - No Trading Banner */}
+                  {currentPhase === 0 && (
+                    <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <Clock className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <div className="font-bold text-blue-900 mb-1">Early LAUNCH Phase</div>
+                          <p className="text-sm text-blue-800">
+                            Trading is not available during the early launch phase. Please wait for the <strong>PRIVATE phase</strong> to start buying tokens with complete privacy protection.
+                          </p>
+                          <div className="mt-2 text-xs text-blue-700 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            Private phase starts in: {formatTimeRemaining(timeRemaining)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Phase 1 (PRIVATE) - Go to Sessions Page */}
+                  {currentPhase === 1 && (
+                    <div className="mt-4 p-4 bg-purple-50 border-2 border-purple-300 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <Shield className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <div className="font-bold text-purple-900 mb-1">🔒 Private Trading Phase Active</div>
+                          <p className="text-sm text-purple-800 mb-3">
+                            This token is now in the PRIVATE phase with complete privacy protection. All trades are hidden from MEV bots and whales. Go to the Sessions page to buy.
+                          </p>
+                          <Link href="/sessions">
+                            <Button className="bg-purple-600 text-white hover:bg-purple-700 w-full font-bold">
+                              Go to Private Sessions →
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Phase 3 (OPEN) - Public Trading */}
+                  {currentPhase === 3 && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-300 rounded-lg text-sm text-green-800">
+                      <strong>✅ Public Trading Open:</strong> This token is now in the OPEN phase with unrestricted trading. No buy limits apply.
                     </div>
                   )}
                 </div>
@@ -419,16 +521,13 @@ export default function TokenTradingPage() {
                 <h3 className="font-bold text-lg mb-4">How Trading Works</h3>
                 <div className="space-y-3 text-sm text-[#121212]/80">
                   <div>
-                    <strong>• LAUNCH Phase:</strong> Fair launch period where max buy limits apply.
+                    <strong>• LAUNCH Phase:</strong> Early launch period. Trading NOT available - wait for Private phase.
                   </div>
                   <div>
-                    <strong>• PRIVATE Phase:</strong> Private accumulation through sessions with limits.
+                    <strong>• PRIVATE Phase:</strong> 🔒 Private trading available! Buy tokens with complete privacy. All trades are hidden until the phase ends. Max buy limits apply. Go to Sessions page.
                   </div>
                   <div>
-                    <strong>• SETTLEMENT Phase:</strong> Sessions close and balances finalize.
-                  </div>
-                  <div>
-                    <strong>• OPEN Phase:</strong> Full trading without restrictions.
+                    <strong>• OPEN Phase:</strong> Public trading with NO restrictions! Settlement happens instantly when private phase ends. Token moves to Tokens page. No buy limits.
                   </div>
                 </div>
               </CardContent>
