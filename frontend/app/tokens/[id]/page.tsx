@@ -14,6 +14,26 @@ import { TransactionBlock } from '@mysten/sui.js/transactions'
 import { MEMEFI_CONFIG } from '@/lib/contract-config'
 import { TradingChart } from '@/components/trading-chart'
 
+/**
+ * Token Trading Page - Displays REAL on-chain data from Sui blockchain
+ * 
+ * DATA SOURCES (All data is fetched from blockchain, NO mock data):
+ * ✅ Token Info: name, symbol, total supply - stored on-chain
+ * ✅ Circulating Supply: calculated from purchases on-chain
+ * ✅ Holders Count: tracked on-chain in token.balances table
+ * ✅ Total Volume: sum of all PurchaseMade events
+ * ✅ Current Price: calculated using bonding curve formula based on supply
+ * ✅ Market Cap: circulating supply × current price (calculated)
+ * ✅ Current Phase: calculated from launch time and phase durations
+ * ✅ User Balance: stored in token.balances[user_address]
+ * ✅ Phase Durations: stored on-chain (earlyPhaseDurationMs, phaseDurationMs)
+ * 
+ * CALCULATED CLIENT-SIDE:
+ * - Time remaining in phase (based on launch time + phase duration)
+ * - Current phase number (LAUNCH=0, PRIVATE=1, OPEN=3)
+ * - Price in SUI (prices are denominated in SUI, not SOL)
+ */
+
 const PHASE_LABELS = ['LAUNCH', 'PRIVATE', 'SETTLEMENT', 'OPEN']
 
 function formatNumber(num: number): string {
@@ -341,7 +361,7 @@ export default function TokenTradingPage() {
                   <div>
                     <div className="text-sm text-gray-400 mb-1">Current Price</div>
                     <div className="font-bold text-xl text-white">
-                      ${token.currentPrice.toFixed(6)} SOL
+                      ${token.currentPrice.toFixed(6)} SUI
                     </div>
                   </div>
 

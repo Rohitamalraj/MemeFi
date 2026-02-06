@@ -321,7 +321,7 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
     // Calculate price using bonding curve
     const circulatingSupply = Number(fields.circulating_supply || 0);
     const totalSupply = Number(fields.total_supply || 1);
-    const basePrice = 0.0001; // Base price in SOL
+    const basePrice = 0.0001; // Base price in SUI (not SOL!)
     const maxMultiplier = 100; // Max price multiplier at 100% supply
     const supplyPercent = circulatingSupply / totalSupply;
     const currentPrice = basePrice * (1 + (maxMultiplier - 1) * supplyPercent);
