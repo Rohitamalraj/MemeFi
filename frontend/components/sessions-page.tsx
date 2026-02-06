@@ -43,7 +43,8 @@ function formatTimeRemaining(seconds: number): string {
 
 function SessionCard({ token }: { token: MemeTokenData }) {
   const now = Date.now()
-  const phaseEndTime = token.launchTime + (token.phaseDurationMs * 2) // End of PRIVATE phase
+  // PRIVATE phase ends after early_phase_duration + phase_duration (instant settlement to OPEN)
+  const phaseEndTime = token.launchTime + token.earlyPhaseDurationMs + token.phaseDurationMs
   const timeRemaining = Math.max(0, Math.floor((phaseEndTime - now) / 1000))
   
   return (

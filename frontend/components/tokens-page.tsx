@@ -82,12 +82,12 @@ function convertToDisplayToken(tokenData: MemeTokenData): Token {
     id: tokenData.id,
     name: tokenData.name,
     symbol: tokenData.symbol,
-    // Placeholder values - will be calculated from actual trading data later
-    price: 0.00001, // Base price
-    priceChange24h: 0,
-    volume24h: 0,
-    marketCap: tokenData.totalSupply * 0.00001, // totalSupply * base price
-    holders: 0, // Will need to query from balances
+    // Use calculated values from blockchain
+    price: tokenData.currentPrice,
+    priceChange24h: 0, // TODO: Track price history
+    volume24h: tokenData.totalVolume, // Use total volume for now
+    marketCap: tokenData.marketCap,
+    holders: tokenData.holderCount,
     phase,
     phaseNumber: tokenData.currentPhase, // Keep actual phase number
     hasActiveSessions: false, // Will need to query active sessions
