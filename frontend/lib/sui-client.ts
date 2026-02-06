@@ -51,7 +51,8 @@ export function createTokenTransaction(params: CreateTokenParams): TransactionBl
       txb.pure(decimals, 'u8'),
       txb.pure(params.totalSupply, 'u64'),
       txb.pure(params.maxBuyPerWallet, 'u64'),
-      txb.pure(params.phaseDurationMs, 'u64'),
+      txb.pure(params.earlyPhaseDurationMs, 'u64'), // Early phase duration (LAUNCH)
+      txb.pure(params.phaseDurationMs, 'u64'), // Session phase duration (PRIVATE/SETTLEMENT/etc)
       txb.pure(params.transfersLocked, 'bool'),
     ],
   });
@@ -149,26 +150,38 @@ export interface MemeTokenData {
   totalSupply: number;
   circulatingSupply: number;
   maxBuyPerWallet: number;
-  phaseDurationMs: number;
+  earlyPhaseDurationMs: number; // Duration for LAUNCH phase
+  phaseDurationMs: number; // Duration for PRIVATE/SETTLEMENT/etc phases
   transfersLocked: boolean;
   currentPhase: number;
   launchTime: number;
   creator: string;
+  holderCount: number;
+  totalVolume: number;
+  currentPrice: number;
+  marketCap: number;
 }
 
 // Helper to calculate actual current phase based on time
-export function calculateCurrentPhase(launchTime: number, phaseDurationMs: number): number {
+export function calculateCurrentPhase(
+  launchTime: number, 
+  earlyPhaseDurationMs: number, 
+  phaseDurationMs: number
+): number {
   const now = Date.now();
   const timeElapsed = now - launchTime;
   
-  if (timeElapsed < phaseDurationMs) {
+  // 3-phase system with instant settlement (no SETTLEMENT phase):
+  // LAUNCH: 0 to early_phase_duration_ms
+  // PRIVATE: early_phase_duration_ms to early_phase_duration_ms + phase_duration_ms
+  // OPEN: after early_phase_duration_ms + phase_duration_ms (instant settlement, goes directly public)
+  
+  if (timeElapsed < earlyPhaseDurationMs) {
     return 0; // PHASE_LAUNCH
-  } else if (timeElapsed < phaseDurationMs * 2) {
+  } else if (timeElapsed < earlyPhaseDurationMs + phaseDurationMs) {
     return 1; // PHASE_PRIVATE
-  } else if (timeElapsed < phaseDurationMs * 3) {
-    return 2; // PHASE_SETTLEMENT
   } else {
-    return 3; // PHASE_OPEN
+    return 3; // PHASE_OPEN (skip SETTLEMENT phase 2 - instant settlement)
   }
 }
 
@@ -207,6 +220,7 @@ export async function getAllTokens(): Promise<MemeTokenData[]> {
           totalSupply: Number(fields.total_supply || 0),
           circulatingSupply: Number(fields.circulating_supply || 0),
           maxBuyPerWallet: Number(fields.max_buy_per_wallet || 0),
+          earlyPhaseDurationMs: Number(fields.early_phase_duration_ms || 0),
           phaseDurationMs: Number(fields.phase_duration_ms || 0),
           transfersLocked: Boolean(fields.transfers_locked),
           currentPhase: Number(fields.current_phase || 0),
@@ -251,19 +265,33 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
     
     const fields = object.data.content.fields as any;
     
+    // Calculate price using bonding curve
+    const circulatingSupply = Number(fields.circulating_supply || 0);
+    const totalSupply = Number(fields.total_supply || 1);
+    const basePrice = 0.0001; // Base price in SOL
+    const maxMultiplier = 100; // Max price multiplier at 100% supply
+    const supplyPercent = circulatingSupply / totalSupply;
+    const currentPrice = basePrice * (1 + (maxMultiplier - 1) * supplyPercent);
+    const marketCap = (circulatingSupply / 1_000_000_000) * currentPrice; // Convert from smallest unit
+
     return {
       id: object.data.objectId,
       name: fields.name || '',
       symbol: fields.symbol || '',
       decimals: Number(fields.decimals || 9),
-      totalSupply: Number(fields.total_supply || 0),
-      circulatingSupply: Number(fields.circulating_supply || 0),
+      totalSupply: totalSupply,
+      circulatingSupply: circulatingSupply,
       maxBuyPerWallet: Number(fields.max_buy_per_wallet || 0),
+      earlyPhaseDurationMs: Number(fields.early_phase_duration_ms || 0),
       phaseDurationMs: Number(fields.phase_duration_ms || 0),
       transfersLocked: Boolean(fields.transfers_locked),
       currentPhase: Number(fields.current_phase || 0),
       launchTime: Number(fields.launch_time || 0),
       creator: fields.creator || '',
+      holderCount: Number(fields.holder_count || 0),
+      totalVolume: Number(fields.total_volume || 0),
+      currentPrice: currentPrice,
+      marketCap: marketCap,
     };
   } catch (error) {
     console.error('Failed to fetch token:', error);

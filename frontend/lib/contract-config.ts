@@ -6,7 +6,7 @@ export const MEMEFI_CONFIG = {
   network: 'testnet', // 'devnet' | 'testnet' | 'mainnet'
   
   // Contract addresses (update after deployment)
-  packageId: '0xbc36f70235c2d954bfc5febc24ff97e08885e08547a23d3e7f4094340346f3ee',
+  packageId: '0x148a2ccb1ea99c676ed2aefd4b57ab1f96af799496ed7e1fa8c8343a5716b21c',
   
   // Module names
   modules: {
@@ -35,6 +35,7 @@ export const CONTRACT_FUNCTIONS = {
   createToken: 'launch_token', // Entry function for creating tokens
   buyTokens: 'buy_tokens',
   advancePhase: 'advance_phase',
+  settlePendingPurchase: 'settle_pending_purchase', // NEW: Settle private purchases during SETTLEMENT phase
   canTransfer: 'can_transfer',
   getPhase: 'get_phase',
   getWalletPurchases: 'get_wallet_purchases',
