@@ -139,13 +139,14 @@ export function usePrivatePhaseTokens() {
       
       // Filter tokens that are currently in PRIVATE phase (phase 1)
       const privateTokens = allTokens.filter(token => {
-        const actualPhase = calculateCurrentPhase(token.launchTime, token.phaseDurationMs);
+        const actualPhase = calculateCurrentPhase(token.launchTime, token.earlyPhaseDurationMs, token.phaseDurationMs);
         const now = Date.now();
         const age = Math.floor((now - token.launchTime) / 1000); // age in seconds
         
         console.log(`  🪙 ${token.name} (${token.symbol}):`);
         console.log(`    - Launch time: ${token.launchTime}`);
-        console.log(`    - Phase duration: ${token.phaseDurationMs}ms (${token.phaseDurationMs / 1000}s)`);
+        console.log(`    - Early phase duration: ${token.earlyPhaseDurationMs}ms (${token.earlyPhaseDurationMs / 1000}s)`);
+        console.log(`    - Private Phase duration: ${token.phaseDurationMs}ms (${token.phaseDurationMs / 1000}s)`);
         console.log(`    - Age: ${age}s`);
         console.log(`    - Calculated phase: ${actualPhase}`);
         console.log(`    - Stored phase: ${token.currentPhase}`);
