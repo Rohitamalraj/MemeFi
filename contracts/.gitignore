@@ -7,3 +7,5 @@ Move.lock
 
 # Documentation (optional)
 SESSION_DEPLOYMENT.md
+
+build/
