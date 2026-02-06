@@ -160,6 +160,7 @@ export interface MemeTokenData {
   totalVolume: number;
   currentPrice: number;
   marketCap: number;
+  priceChange24h?: number; // Calculated price change over 24h
 }
 
 // Helper to calculate actual current phase based on time
@@ -272,7 +273,17 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
     const maxMultiplier = 100; // Max price multiplier at 100% supply
     const supplyPercent = circulatingSupply / totalSupply;
     const currentPrice = basePrice * (1 + (maxMultiplier - 1) * supplyPercent);
-    const marketCap = (circulatingSupply / 1_000_000_000) * currentPrice; // Convert from smallest unit
+    
+    // Market cap = circulating supply (in tokens) * current price
+    // circulating_supply is already in base units (smallest denomination)
+    // So we divide by 1B to get token amount, then multiply by price
+    const circulatingTokens = circulatingSupply / 1_000_000_000;
+    const marketCap = circulatingTokens * currentPrice;
+
+    // Calculate 24h price change by comparing with initial price
+    // Initial price when no supply has been sold yet
+    const initialPrice = basePrice;
+    const priceChange24h = ((currentPrice - initialPrice) / initialPrice) * 100;
 
     return {
       id: object.data.objectId,
@@ -292,6 +303,7 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
       totalVolume: Number(fields.total_volume || 0),
       currentPrice: currentPrice,
       marketCap: marketCap,
+      priceChange24h: priceChange24h,
     };
   } catch (error) {
     console.error('Failed to fetch token:', error);
