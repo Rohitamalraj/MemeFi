@@ -75,15 +75,15 @@ module memefi::token_v2 {
         token_id: ID,
         token_name: String,
         old_phase: u8,
-     
+        new_phase: u8,
+        timestamp: u64,
+    }
 
     public struct TokenWithdrawn has copy, drop {
         token_id: ID,
         user: address,
         amount: u64,
         remaining_balance: u64,
-    }   new_phase: u8,
-        timestamp: u64,
     }
 
     /// Launch a new token

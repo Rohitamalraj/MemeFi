@@ -189,9 +189,8 @@ export default function TokenTradingPage() {
     setIsTrading(true)
 
     try {
-      // Note: You'll need the TreasuryCap object ID
-      // This should be stored when the wrapped_token module is deployed
-      const TREASURY_CAP_ID = '0x_TREASURY_CAP_OBJECT_ID' // TODO: Replace with actual ID
+      // TreasuryCap object ID from wrapped_token deployment
+      const TREASURY_CAP_ID = '0xad89b22690d8f9b464a53c4963b61e5c52fc42510184a26f6da697db68c227f2'
 
       const txb = new TransactionBlock()
       

@@ -1,17 +1,22 @@
 /// MemeFi Token Module V2
 /// Simplified token system for fair launch platform
 /// Uses custom balance tracking instead of Sui Coin for easier dynamic token creation
+/// Supports hybrid model: platform balances + wallet withdrawals
 module memefi::token_v2 {
     use sui::table::{Self, Table};
     use sui::event;
     use sui::clock::{Self, Clock};
     use std::string::{Self, String};
+    use sui::coin::{Self, Coin, TreasuryCap};
+    use memefi::wrapped_token::{Self, WRAPPED_TOKEN};
 
     /// Errors
     const EExceedsMaxBuy: u64 = 1;
     const ETransfersLocked: u64 = 2;
     const EInsufficientBalance: u64 = 3;
     const EInvalidPhase: u64 = 4;
+    const EWithdrawalNotAllowed: u64 = 5;
+    const ENoBalance: u64 = 6;
 
     /// Launch phases - 4-phase lifecycle
     const PHASE_LAUNCH: u8 = 0;      // Fair-launch rules apply
@@ -72,6 +77,13 @@ module memefi::token_v2 {
         old_phase: u8,
         new_phase: u8,
         timestamp: u64,
+    }
+
+    public struct TokenWithdrawn has copy, drop {
+        token_id: ID,
+        user: address,
+        amount: u64,
+        remaining_balance: u64,
     }
 
     /// Launch a new token
@@ -361,6 +373,77 @@ module memefi::token_v2 {
         (base_price * price_multiplier) / 10000
     }
 
+
+    /// Withdraw tokens to wallet as Sui Coins
+    /// Only available during OPEN phase (phase 3)
+    /// Converts platform balance to wrapped Coin<WRAPPED_TOKEN> objects
+    public entry fun withdraw_to_wallet(
+        clock: &Clock,
+        token: &mut MemeToken,
+        treasury_cap: &mut TreasuryCap<WRAPPED_TOKEN>,
+        amount: u64,
+        ctx: &mut TxContext
+    ) {
+        let sender = tx_context::sender(ctx);
+        let current_time = clock::timestamp_ms(clock);
+
+        // Update phase if needed
+        update_phase_internal(token, current_time);
+
+        // Only allow withdrawals during OPEN phase (phase 3)
+        assert!(token.current_phase == PHASE_OPEN, EWithdrawalNotAllowed);
+
+        // Check user has balance
+        assert!(table::contains(&token.balances, sender), ENoBalance);
+        let balance = table::borrow_mut(&mut token.balances, sender);
+        assert!(*balance >= amount, EInsufficientBalance);
+
+        // Reduce platform balance
+        *balance = *balance - amount;
+        let remaining = *balance;
+
+        // Mint wrapped token and send to user's wallet
+        let coin = wrapped_token::mint(treasury_cap, amount, ctx);
+        transfer::public_transfer(coin, sender);
+
+        // Emit event
+        event::emit(TokenWithdrawn {
+            token_id: object::uid_to_inner(&token.id),
+            user: sender,
+            amount,
+            remaining_balance: remaining,
+        });
+    }
+
+    /// Deposit wrapped tokens back to platform balance
+    /// Allows users to move tokens from wallet back to platform
+    public entry fun deposit_from_wallet(
+        clock: &Clock,
+        token: &mut MemeToken,
+        treasury_cap: &mut TreasuryCap<WRAPPED_TOKEN>,
+        coin: Coin<WRAPPED_TOKEN>,
+        ctx: &mut TxContext
+    ) {
+        let sender = tx_context::sender(ctx);
+        let current_time = clock::timestamp_ms(clock);
+        
+        // Update phase if needed
+        update_phase_internal(token, current_time);
+
+        let amount = coin::value(&coin);
+
+        // Burn the wrapped coin
+        wrapped_token::burn(treasury_cap, coin);
+
+        // Add to platform balance
+        if (table::contains(&token.balances, sender)) {
+            let balance = table::borrow_mut(&mut token.balances, sender);
+            *balance = *balance + amount;
+        } else {
+            table::add(&mut token.balances, sender, amount);
+            token.holder_count = token.holder_count + 1;
+        };
+    }
     /// Calculate market cap (circulating_supply * current_price)
     public fun get_market_cap(token: &MemeToken): u64 {
         let price = get_current_price(token);
