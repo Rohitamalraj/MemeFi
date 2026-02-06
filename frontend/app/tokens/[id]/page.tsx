@@ -12,6 +12,7 @@ import { getSuiClient, getTokenById, MemeTokenData } from '@/lib/sui-client'
 import { toast } from 'sonner'
 import { TransactionBlock } from '@mysten/sui.js/transactions'
 import { MEMEFI_CONFIG } from '@/lib/contract-config'
+import { TradingChart } from '@/components/trading-chart'
 
 const PHASE_LABELS = ['LAUNCH', 'PRIVATE', 'SETTLEMENT', 'OPEN']
 
@@ -368,8 +369,18 @@ export default function TokenTradingPage() {
             </Card>
           </div>
 
-          {/* Right Column - Trading Interface */}
-          <div className="lg:col-span-2">
+          {/* Right Column - Chart & Trading Interface */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Trading Chart */}
+            <TradingChart
+              tokenId={tokenId}
+              tokenSymbol={token.symbol}
+              currentPhase={currentPhase}
+              isPrivatePhase={currentPhase === 1}
+              intervalMinutes={1}
+            />
+
+            {/* Trading Card */}
             <Card className="border-2">
               <CardContent className="pt-6">
                 <div className="mb-6">
