@@ -1,0 +1,349 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
+import { Wallet, TrendingUp, Clock, ExternalLink, Activity, DollarSign } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
+import { useWalletConnection } from "@/lib/use-wallet"
+import { getSuiClient, getTokenById } from "@/lib/sui-client"
+import { MEMEFI_CONFIG } from "@/lib/contract-config"
+
+interface TokenHolding {
+  tokenId: string
+  tokenName: string
+  tokenSymbol: string
+  balance: number
+  currentPrice: number
+  value: number
+  imageUrl?: string
+}
+
+interface Transaction {
+  digest: string
+  timestamp: number
+  tokenName: string
+  tokenSymbol: string
+  amount: number
+  price: number
+  totalCost: number
+  type: 'buy' | 'sell'
+}
+
+function formatNumber(num: number): string {
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`
+  if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K`
+  return num.toFixed(2)
+}
+
+function formatDate(timestamp: number): string {
+  const date = new Date(timestamp)
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+export function PortfolioPage() {
+  const { address, isConnected } = useWalletConnection()
+  const [holdings, setHoldings] = useState<TokenHolding[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
+  const [totalValue, setTotalValue] = useState(0)
+
+  useEffect(() => {
+    if (!address) {
+      setLoading(false)
+      return
+    }
+
+    async function fetchPortfolio() {
+      try {
+        const client = getSuiClient()
+
+        // Fetch all PurchaseMade events for this user
+        const events = await client.queryEvents({
+          query: {
+            MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::PurchaseMade`
+          },
+          order: 'descending',
+        })
+
+        console.log('📊 Fetched events:', events.data.length)
+
+        // Group by token to calculate holdings
+        const holdingsMap = new Map<string, { balance: number; txs: any[] }>()
+        const transactionsList: Transaction[] = []
+
+        for (const event of events.data) {
+          const parsedJson = event.parsedJson as any
+          const buyer = parsedJson.buyer
+          const tokenId = parsedJson.token_id
+          const amount = Number(parsedJson.amount)
+
+          // Only include transactions for this user
+          if (buyer === address) {
+            if (!holdingsMap.has(tokenId)) {
+              holdingsMap.set(tokenId, { balance: 0, txs: [] })
+            }
+
+            const holding = holdingsMap.get(tokenId)!
+            holding.balance += amount
+            holding.txs.push({
+              digest: event.id.txDigest,
+              timestamp: Number(event.timestampMs),
+              amount,
+            })
+          }
+        }
+
+        // Fetch token details for each token
+        const holdingsArray: TokenHolding[] = []
+        for (const [tokenId, data] of holdingsMap.entries()) {
+          try {
+            const token = await getTokenById(tokenId)
+            if (token && data.balance > 0) {
+              holdingsArray.push({
+                tokenId,
+                tokenName: token.name,
+                tokenSymbol: token.symbol,
+                balance: data.balance,
+                currentPrice: token.currentPrice,
+                value: data.balance * token.currentPrice,
+                imageUrl: token.imageUrl,
+              })
+
+              // Add transactions for this token
+              for (const tx of data.txs) {
+                transactionsList.push({
+                  digest: tx.digest,
+                  timestamp: tx.timestamp,
+                  tokenName: token.name,
+                  tokenSymbol: token.symbol,
+                  amount: tx.amount,
+                  price: token.currentPrice,
+                  totalCost: tx.amount * token.currentPrice,
+                  type: 'buy'
+                })
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching token ${tokenId}:`, error)
+          }
+        }
+
+        setHoldings(holdingsArray)
+        setTransactions(transactionsList)
+
+        const total = holdingsArray.reduce((sum, h) => sum + h.value, 0)
+        setTotalValue(total)
+
+        console.log('💼 Holdings:', holdingsArray)
+        console.log('📝 Transactions:', transactionsList.length)
+      } catch (error) {
+        console.error('Error fetching portfolio:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPortfolio()
+  }, [address])
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-white pt-24 pb-20">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center py-20">
+            <Wallet className="w-16 h-16 text-[#121212]/20 mx-auto mb-4" />
+            <h2 className="text-2xl font-black text-[#121212] mb-2">Connect Your Wallet</h2>
+            <p className="text-[#121212]/60">Connect your wallet to view your portfolio</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white pt-24 pb-20">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center py-20">
+            <div className="w-16 h-16 border-4 border-[#AFFF00] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-[#121212]/60">Loading portfolio...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-white pt-24 pb-20">
+      <div className="max-w-7xl mx-auto px-6">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <h1 className="text-5xl md:text-6xl font-black text-[#121212] mb-4">
+            My Portfolio
+          </h1>
+          <p className="text-xl text-[#121212]/70">
+            Track your holdings and transaction history
+          </p>
+        </motion.div>
+
+        {/* Total Value Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="mb-8"
+        >
+          <Card className="border-2 border-[#AFFF00] bg-gradient-to-br from-[#AFFF00]/10 to-white">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-2">
+                <DollarSign className="w-6 h-6 text-[#7AB800]" />
+                <h3 className="text-sm font-bold text-[#121212]/60">Total Portfolio Value</h3>
+              </div>
+              <div className="text-4xl font-black text-[#121212]">
+                {totalValue.toFixed(4)} SUI
+              </div>
+              <div className="mt-2 text-sm text-[#121212]/60">
+                Across {holdings.length} token{holdings.length !== 1 ? 's' : ''}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Holdings */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-8"
+        >
+          <h2 className="text-2xl font-black text-[#121212] mb-4">Your Holdings</h2>
+
+          {holdings.length === 0 ? (
+            <Card className="border-2">
+              <CardContent className="pt-6 text-center py-12">
+                <Activity className="w-12 h-12 text-[#121212]/20 mx-auto mb-3" />
+                <p className="text-[#121212]/60">No token holdings yet</p>
+                <Link href="/tokens">
+                  <Button className="mt-4 bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90">
+                    Explore Tokens
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {holdings.map((holding) => (
+                <Link key={holding.tokenId} href={`/tokens/${holding.tokenId}`}>
+                  <Card className="border-2 hover:border-[#AFFF00] transition-all cursor-pointer group">
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="font-bold text-lg text-[#121212] group-hover:text-[#AFFF00] transition-colors">
+                            {holding.tokenName}
+                          </h3>
+                          <p className="text-sm text-[#121212]/60 font-mono">${holding.tokenSymbol}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-[#121212]/60">Balance</span>
+                          <span className="font-bold">{formatNumber(holding.balance)} {holding.tokenSymbol}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-[#121212]/60">Price</span>
+                          <span className="font-bold">{holding.currentPrice.toFixed(6)} SUI</span>
+                        </div>
+                        <div className="flex justify-between text-sm pt-2 border-t">
+                          <span className="text-[#121212]/60">Value</span>
+                          <span className="font-bold text-[#AFFF00]">{holding.value.toFixed(4)} SUI</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Transaction History */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <h2 className="text-2xl font-black text-[#121212] mb-4">Transaction History</h2>
+
+          {transactions.length === 0 ? (
+            <Card className="border-2">
+              <CardContent className="pt-6 text-center py-12">
+                <Clock className="w-12 h-12 text-[#121212]/20 mx-auto mb-3" />
+                <p className="text-[#121212]/60">No transaction history yet</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-2">
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  {transactions.map((tx, index) => (
+                    <div
+                      key={tx.digest + index}
+                      className="flex items-center justify-between py-3 border-b last:border-b-0"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded">
+                            BUY
+                          </span>
+                          <span className="font-bold text-[#121212]">
+                            {formatNumber(tx.amount)} {tx.tokenSymbol}
+                          </span>
+                        </div>
+                        <div className="text-sm text-[#121212]/60 flex items-center gap-2">
+                          <Clock className="w-3 h-3" />
+                          {formatDate(tx.timestamp)}
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="font-bold text-[#121212]">
+                          {tx.totalCost.toFixed(6)} SUI
+                        </div>
+                        <div className="text-xs text-[#121212]/60">
+                          @ {tx.price.toFixed(8)} SUI
+                        </div>
+                      </div>
+
+                      <a
+                        href={`https://testnet.suivision.xyz/txblock/${tx.digest}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-4"
+                      >
+                        <Button variant="outline" size="sm" className="border-2">
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+      </div>
+    </div>
+  )
+}

@@ -318,6 +318,14 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
     
     const fields = object.data.content.fields as any;
     
+    console.log('📊 Token fields:', {
+      circulating_supply: fields.circulating_supply,
+      total_supply: fields.total_supply,
+      total_volume: fields.total_volume,
+      holder_count: fields.holder_count,
+      current_phase: fields.current_phase,
+    });
+    
     // Calculate price using bonding curve
     const circulatingSupply = Number(fields.circulating_supply || 0);
     const totalSupply = Number(fields.total_supply || 1);
@@ -331,6 +339,21 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
     // So we divide by 1B to get token amount, then multiply by price
     const circulatingTokens = circulatingSupply / 1_000_000_000;
     const marketCap = circulatingTokens * currentPrice;
+
+    // Calculate volume in SUI (not just token count)
+    // total_volume is in base units (tokens), convert and multiply by average price
+    // For simplicity, use current price as approximation
+    const volumeTokens = Number(fields.total_volume || 0) / 1_000_000_000;
+    const volumeSUI = volumeTokens * currentPrice;
+
+    console.log('💰 Calculated values:', {
+      circulatingSupply,
+      circulatingTokens,
+      currentPrice,
+      marketCap,
+      volumeTokens,
+      volumeSUI,
+    });
 
     // Calculate 24h price change by comparing with initial price
     // Initial price when no supply has been sold yet
@@ -355,7 +378,7 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
       launchTime: Number(fields.launch_time || 0),
       creator: fields.creator || '',
       holderCount: Number(fields.holder_count || 0),
-      totalVolume: Number(fields.total_volume || 0),
+      totalVolume: volumeSUI, // Volume in SUI, not token count
       currentPrice: currentPrice,
       marketCap: marketCap,
       priceChange24h: priceChange24h,
@@ -364,6 +387,49 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
   } catch (error) {
     console.error('Failed to fetch token:', error);
     return null;
+  }
+}
+
+// Get user's token balance for a specific token by querying purchase events
+export async function getUserTokenBalance(tokenId: string, userAddress: string): Promise<number> {
+  const client = getSuiClient();
+  
+  try {
+    // Query all PurchaseMade events for this token
+    const events = await client.queryEvents({
+      query: {
+        MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::PurchaseMade`
+      },
+      order: 'descending',
+    });
+
+    console.log('📊 Querying balance for token:', tokenId, 'user:', userAddress);
+    console.log('📊 Found', events.data.length, 'purchase events');
+
+    // Sum up all purchases for this user and token
+    let totalBalance = 0;
+    
+    for (const event of events.data) {
+      const parsedJson = event.parsedJson as any;
+      const buyer = parsedJson.buyer;
+      const eventTokenId = parsedJson.token_id;
+      const amount = Number(parsedJson.amount);
+
+      // Check if this event is for the user and token we're looking for
+      if (buyer === userAddress && eventTokenId === tokenId) {
+        totalBalance += amount;
+        console.log('✅ Found purchase:', amount, 'tokens');
+      }
+    }
+
+    // Convert from base units to tokens
+    const balanceInTokens = totalBalance / 1_000_000_000;
+    console.log('💼 Total balance:', balanceInTokens, 'tokens');
+    
+    return balanceInTokens;
+  } catch (error) {
+    console.error('Failed to fetch user balance:', error);
+    return 0;
   }
 }
 

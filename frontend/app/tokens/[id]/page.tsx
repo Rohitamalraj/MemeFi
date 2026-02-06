@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useWalletConnection } from '@/lib/use-wallet'
-import { getSuiClient, getTokenById, MemeTokenData, withdrawToWalletTransaction } from '@/lib/sui-client'
+import { getSuiClient, getTokenById, getUserTokenBalance, MemeTokenData, withdrawToWalletTransaction } from '@/lib/sui-client'
 import { toast } from 'sonner'
 import { TransactionBlock } from '@mysten/sui.js/transactions'
 import { MEMEFI_CONFIG } from '@/lib/contract-config'
@@ -40,7 +40,10 @@ function formatNumber(num: number): string {
   if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B`
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`
   if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K`
-  return num.toFixed(2)
+  if (num >= 1) return num.toFixed(2)
+  if (num >= 0.01) return num.toFixed(4)
+  if (num > 0) return num.toFixed(6)
+  return '0.00'
 }
 
 function formatTimeRemaining(seconds: number): string {
@@ -76,7 +79,7 @@ export default function TokenTradingPage() {
   const [token, setToken] = useState<MemeTokenData | null>(null)
   const [loading, setLoading] = useState(true)
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy')
-  const [amount, setAmount] = useState('')
+  const [suiAmount, setSuiAmount] = useState('') // Changed from token amount to SUI amount
   const [isTrading, setIsTrading] = useState(false)
   const [userBalance, setUserBalance] = useState(0)
   const [timeRemaining, setTimeRemaining] = useState(0)
@@ -131,12 +134,15 @@ export default function TokenTradingPage() {
     return () => clearInterval(interval)
   }, [token])
 
-  // Fetch user balance (mock for now - would query from blockchain)
+  // Fetch user balance from blockchain
   useEffect(() => {
-    if (address && token) {
-      // TODO: Query actual balance from blockchain
-      setUserBalance(0)
+    async function fetchBalance() {
+      if (address && token) {
+        const balance = await getUserTokenBalance(token.id, address)
+        setUserBalance(balance)
+      }
     }
+    fetchBalance()
   }, [address, token])
 
   const handleTrade = async () => {
@@ -145,7 +151,7 @@ export default function TokenTradingPage() {
       return
     }
 
-    if (!amount || parseFloat(amount) <= 0) {
+    if (!suiAmount || parseFloat(suiAmount) <= 0) {
       toast.error('Please enter a valid amount')
       return
     }
@@ -155,7 +161,9 @@ export default function TokenTradingPage() {
     setIsTrading(true)
 
     try {
-      const amountInUnits = Math.floor(parseFloat(amount) * 1_000_000_000) // Convert to base units
+      // Calculate how many tokens user will get for the SUI amount
+      const tokensToGet = parseFloat(suiAmount) / token.currentPrice
+      const amountInUnits = Math.floor(tokensToGet * 1_000_000_000) // Convert to base units
 
       if (tradeType === 'buy') {
         // Buy tokens
@@ -172,14 +180,20 @@ export default function TokenTradingPage() {
 
         const result = await executeTransaction(
           txb,
-          `Successfully purchased ${parseFloat(amount).toFixed(9)} ${token.symbol}!`
+          `Successfully purchased ${formatNumber(tokensToGet)} ${token.symbol} for ${parseFloat(suiAmount).toFixed(4)} SUI!`
         )
 
         if (result.success) {
-          setAmount('')
-          // Refresh token data
+          setSuiAmount('')
+          // Refresh token data and balance
           const updatedToken = await getTokenById(tokenId)
           if (updatedToken) setToken(updatedToken)
+          
+          // Refresh user balance
+          if (address) {
+            const balance = await getUserTokenBalance(tokenId, address)
+            setUserBalance(balance)
+          }
         }
       } else {
         // Sell functionality would go here
@@ -233,7 +247,12 @@ export default function TokenTradingPage() {
         // Refresh token data and balance
         const updatedToken = await getTokenById(tokenId)
         if (updatedToken) setToken(updatedToken)
-        setUserBalance(0)
+        
+        // Refetch user balance from blockchain
+        if (address) {
+          const balance = await getUserTokenBalance(tokenId, address)
+          setUserBalance(balance)
+        }
       }
     } catch (error: any) {
       console.error('Withdraw error:', error)
@@ -354,14 +373,14 @@ export default function TokenTradingPage() {
                   <div>
                     <div className="text-sm text-gray-400 mb-1">Market Cap</div>
                     <div className="font-black text-2xl text-[#AFFF00]">
-                      ${formatNumber(token.marketCap)}
+                      {formatNumber(token.marketCap)} SUI
                     </div>
                   </div>
 
                   <div>
                     <div className="text-sm text-gray-400 mb-1">Current Price</div>
                     <div className="font-bold text-xl text-white">
-                      ${token.currentPrice.toFixed(6)} SUI
+                      {token.currentPrice.toFixed(6)} SUI
                     </div>
                   </div>
 
@@ -371,7 +390,7 @@ export default function TokenTradingPage() {
                         <Users className="w-3 h-3" />
                         Holders
                       </div>
-                      <div className="font-bold text-xl text-white">{token.holderCount}</div>
+                      <div className="font-bold text-xl text-white">{token.holderCount.toLocaleString()}</div>
                     </div>
 
                     <div>
@@ -379,7 +398,7 @@ export default function TokenTradingPage() {
                         <Activity className="w-3 h-3" />
                         Volume
                       </div>
-                      <div className="font-bold text-xl text-white">{formatNumber(token.totalVolume)}</div>
+                      <div className="font-bold text-xl text-white">{formatNumber(token.totalVolume)} SUI</div>
                     </div>
                   </div>
                 </div>
@@ -535,59 +554,64 @@ export default function TokenTradingPage() {
                     </Button>
                   </div>
 
-                  {/* Amount Input */}
-                  <div className="mb-6">
+                  {/* SUI Amount Input */}
+                  <div className="mb-4">
                     <label className="block text-sm font-bold text-white mb-2">
-                      Amount ({token.symbol})
+                      Pay with SUI
                     </label>
                     <input
                       type="number"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.00"
+                      value={suiAmount}
+                      onChange={(e) => setSuiAmount(e.target.value)}
+                      placeholder="0.0"
                       className="w-full px-4 py-3 border-2 border-gray-700 bg-[#1a1a1a] text-white rounded-lg focus:border-[#AFFF00] focus:outline-none text-lg font-bold"
-                      step="0.000000001"
+                      step="0.001"
                       min="0"
                     />
                     <div className="flex justify-between mt-2 text-xs text-gray-400">
-                      <span>Min: 0.000000001</span>
-                      <span>Max: {formatNumber(token.maxBuyPerWallet)}</span>
+                      <span>Min: 0.001 SUI</span>
+                      <span>balance: 0 SUI</span>
                     </div>
                   </div>
 
-                  {/* Quick Amount Buttons */}
-                  <div className="grid grid-cols-4 gap-2 mb-6">
-                    {[1000, 10000, 100000, 1000000].map((val) => (
+                  {/* Quick SUI Amount Buttons */}
+                  <div className="grid grid-cols-4 gap-2 mb-4">
+                    {[0.1, 0.5, 1, 5].map((val) => (
                       <Button
                         key={val}
-                        onClick={() => setAmount((val / 1_000_000_000).toString())}
+                        onClick={() => setSuiAmount(val.toString())}
                         variant="outline"
                         size="sm"
-                        className="border-2 border-gray-700 bg-[#1a1a1a] text-white hover:bg-[#2a2a2a]"
+                        className="border-2 border-gray-700 bg-[#1a1a1a] text-white hover:bg-[#2a2a2a] font-bold"
                       >
-                        {formatNumber(val)}
+                        {val} SUI
                       </Button>
                     ))}
                   </div>
 
-                  {/* Trade Summary */}
-                  {amount && parseFloat(amount) > 0 && (
-                    <div className="bg-[#1a1a1a] rounded-lg p-4 mb-6 space-y-2 border border-gray-800">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-400">You {tradeType}</span>
-                        <span className="font-bold text-white">{parseFloat(amount).toFixed(9)} {token.symbol}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-400">Phase</span>
-                        <span className="font-bold text-white">{PHASE_LABELS[currentPhase]}</span>
+                  {/* Token Amount Preview */}
+                  {suiAmount && parseFloat(suiAmount) > 0 && (
+                    <div className="bg-gradient-to-r from-[#AFFF00]/10 to-[#AFFF00]/5 rounded-lg p-4 mb-4 border border-[#AFFF00]/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-400">You will receive</span>
+                        <div className="text-right">
+                          <div className="text-xl font-black text-[#AFFF00]">
+                            {formatNumber(parseFloat(suiAmount) / token.currentPrice)} {token.symbol}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            @ {token.currentPrice.toFixed(8)} SUI per token
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
 
+
+
                   {/* Trade Button */}
                   <Button
                     onClick={handleTrade}
-                    disabled={!address || !amount || parseFloat(amount) <= 0 || isTrading || currentPhase === 0}
+                    disabled={!address || !suiAmount || parseFloat(suiAmount) <= 0 || isTrading || currentPhase === 0}
                     className="w-full bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold text-lg py-6 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {!address
@@ -596,7 +620,9 @@ export default function TokenTradingPage() {
                       ? 'Trading Starts in Private Phase'
                       : isTrading
                       ? 'Processing...'
-                      : `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${token.symbol}`}
+                      : suiAmount && parseFloat(suiAmount) > 0
+                      ? `Buy ${formatNumber(parseFloat(suiAmount) / token.currentPrice)} ${token.symbol}`
+                      : `Buy ${token.symbol}`}
                   </Button>
 
                   {/* Phase 0 (LAUNCH) - No Trading Banner */}
