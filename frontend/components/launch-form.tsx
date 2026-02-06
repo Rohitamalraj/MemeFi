@@ -286,7 +286,7 @@ export function LaunchForm() {
                       </div>
 
                       <Button
-                        onClick={() => setCurrentStep(2)}
+                        onClick={() => setCurrentStep(2)} 
                         disabled={!isStep1Valid}
                         className="w-full bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold py-6 rounded-full text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                       >
