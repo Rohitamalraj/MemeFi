@@ -84,8 +84,8 @@ function convertToDisplayToken(tokenData: MemeTokenData): Token {
     symbol: tokenData.symbol,
     // Use calculated values from blockchain
     price: tokenData.currentPrice,
-    priceChange24h: 0, // TODO: Track price history
-    volume24h: tokenData.totalVolume, // Use total volume for now
+    priceChange24h: tokenData.priceChange24h || 0, // Use calculated price change
+    volume24h: tokenData.totalVolume / 1_000_000_000, // Convert to tokens (from base units)
     marketCap: tokenData.marketCap,
     holders: tokenData.holderCount,
     phase,
