@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useLayoutEffect } from 'react'
+import { useEffect, useRef, useLayoutEffect, useState } from 'react'
 import { 
   createChart, 
   ColorType, 
@@ -11,8 +11,10 @@ import {
 } from 'lightweight-charts'
 import { useChartData } from '@/lib/use-chart-data'
 import { motion } from 'framer-motion'
-import { TrendingUp, Clock, Lock } from 'lucide-react'
+import { TrendingUp, Clock, Lock, Eye } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { formatUSD } from '@/lib/price-feed'
 
 interface TradingChartProps {
   tokenId: string
@@ -20,24 +22,49 @@ interface TradingChartProps {
   currentPhase: number
   isPrivatePhase: boolean
   intervalMinutes?: number
+  marketCap?: number
+  marketCapUsd?: number
+  marketCapChange24h?: number
+  marketCapChangePercent24h?: number
+  totalVolume?: number
+  currentPrice?: number
+  currentPriceUsd?: number
+  suiUsdPrice?: number
 }
+
+type Timeframe = '1m' | '5m' | '15m' | '1H' | '1D'
+type DisplayMode = 'price' | 'mcap'
+type PriceMode = 'usd' | 'sui'
 
 export function TradingChart({
   tokenId,
   tokenSymbol,
   currentPhase,
   isPrivatePhase,
-  intervalMinutes = 1
+  intervalMinutes = 1,
+  marketCap = 0,
+  marketCapUsd = 0,
+  marketCapChange24h = 0,
+  marketCapChangePercent24h = 0,
+  totalVolume = 0,
+  currentPrice = 0,
+  currentPriceUsd = 0,
+  suiUsdPrice = 1.5,
 }: TradingChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candleSeriesRef = useRef<any>(null)
   const volumeSeriesRef = useRef<any>(null)
 
+  const [timeframe, setTimeframe] = useState<Timeframe>('1m')
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('price')
+  const [priceMode, setPriceMode] = useState<PriceMode>('usd')
+  const [showBubbles, setShowBubbles] = useState(true)
+
   const { candles, volumeData, loading, error, isEmpty } = useChartData(
     tokenId,
     intervalMinutes,
-    !isPrivatePhase // Only auto-refresh when not in private phase
+    !isPrivatePhase
   )
 
   // Initialize chart - useLayoutEffect runs synchronously after DOM updates
@@ -175,15 +202,172 @@ export function TradingChart({
   }, [candles, volumeData])
 
   return (
-    <Card className="border-2 bg-[#0f0f0f]">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-[#AFFF00]" />
-            Price Chart
-          </h3>
-          <div className="text-xs text-gray-400 font-mono">
-            {candles.length} candles • {intervalMinutes}m interval
+    <Card className="border-2 border-gray-800 bg-[#0f0f0f]">
+      <CardContent className="p-0">
+        {/* Pump.fun Style Header */}
+        <div className="p-6 pb-0">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <div className="text-sm text-gray-400 mb-2">Market Cap</div>
+              <div className="text-3xl font-black text-white mb-2">
+                {priceMode === 'usd' && marketCapUsd > 0 
+                  ? formatUSD(marketCapUsd) 
+                  : `${marketCap.toFixed(2)} SUI`}
+              </div>
+              {marketCapChange24h !== undefined && marketCapChangePercent24h !== undefined && (
+                <div className={`text-sm font-bold flex items-center gap-1 ${
+                  marketCapChange24h >= 0 ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {marketCapChange24h >= 0 ? '+' : ''}{priceMode === 'usd' ? formatUSD(marketCapChange24h) : `${marketCapChange24h.toFixed(4)} SUI`}
+                  {' '}({marketCapChange24h >= 0 ? '+' : ''}{marketCapChangePercent24h.toFixed(2)}%) 24hr
+                </div>
+              )}
+            </div>
+            
+            <div className="text-right text-sm">
+              <div className="text-gray-400 mb-1">ATH</div>
+              <div className="font-bold text-white">
+                {priceMode === 'usd' && marketCapUsd > 0
+                  ? formatUSD(marketCapUsd * 1.5)
+                  : `${(marketCap * 1.5).toFixed(4)} SUI`}
+              </div>
+            </div>
+          </div>
+
+          {/* Chart Controls */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            {/* Timeframe Selector */}
+            <div className="flex items-center gap-1 bg-[#1a1a1a] rounded-lg p-1">
+              {(['1m', '5m', '15m', '1H', '1D'] as Timeframe[]).map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => setTimeframe(tf)}
+                  className={`px-3 py-1 text-xs font-bold rounded transition-colors ${
+                    timeframe === tf
+                      ? 'bg-[#AFFF00] text-[#121212]'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+
+            {/* Trade Display Toggle */}
+            <button
+              onClick={() => setShowBubbles(!showBubbles)}
+              className={`flex items-center gap-2 px-3 py-1 text-xs font-bold rounded-lg transition-colors ${
+                showBubbles
+                  ? 'bg-[#AFFF00]/20 text-[#AFFF00]'
+                  : 'bg-[#1a1a1a] text-gray-400'
+              }`}
+            >
+              <Eye className="w-3 h-3" />
+              Trade Display
+            </button>
+
+            {/* Hide All Bubbles */}
+            <button
+              className="px-3 py-1 text-xs font-bold rounded-lg bg-[#1a1a1a] text-gray-400 hover:text-white transition-colors"
+            >
+              Hide All Bubbles
+            </button>
+
+            {/* Price/MCap Toggle */}
+            <div className="flex items-center gap-1 bg-[#1a1a1a] rounded-lg p-1">
+              <button
+                onClick={() => setDisplayMode('price')}
+                className={`px-3 py-1 text-xs font-bold rounded transition-colors ${
+                  displayMode === 'price'
+                    ? 'bg-[#AFFF00] text-[#121212]'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Price
+              </button>
+              <button
+                onClick={() => setDisplayMode('mcap')}
+                className={`px-3 py-1 text-xs font-bold rounded transition-colors ${
+                  displayMode === 'mcap'
+                    ? 'bg-[#AFFF00] text-[#121212]'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                MCap
+              </button>
+            </div>
+
+            {/* USD/SUI Toggle */}
+            <div className="flex items-center gap-1 bg-[#1a1a1a] rounded-lg p-1">
+              <button
+                onClick={() => setPriceMode('usd')}
+                className={`px-3 py-1 text-xs font-bold rounded transition-colors ${
+                  priceMode === 'usd'
+                    ? 'bg-[#AFFF00] text-[#121212]'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                USD
+              </button>
+              <button
+                onClick={() => setPriceMode('sui')}
+                className={`px-3 py-1 text-xs font-bold rounded transition-colors ${
+                  priceMode === 'sui'
+                    ? 'bg-[#AFFF00] text-[#121212]'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                SUI
+              </button>
+            </div>
+          </div>
+
+          {/* Token Info Bar */}
+          <div className="text-xs text-gray-400 mb-4 flex items-center gap-4">
+            <div>
+              <span className="text-gray-500">{tokenSymbol}/{priceMode === 'usd' ? 'USD' : 'SUI'} Market Cap ({priceMode === 'usd' ? 'USD' : 'SUI'})</span> • 1 • 
+              <span className="text-emerald-400 ml-1">Pump</span>
+            </div>
+            {candles.length > 0 && (
+              <div className="text-[#AFFF00] font-bold flex items-center gap-1">
+                <span className="text-[#AFFF00]">
+                  {priceMode === 'usd' && currentPriceUsd 
+                    ? formatUSD(currentPriceUsd) 
+                    : currentPrice.toFixed(6)}
+                </span>
+                <span className="text-emerald-400">H</span>
+                <span className="text-yellow-400">
+                  {priceMode === 'usd' && currentPriceUsd 
+                    ? formatUSD(Math.max(...candles.map(c => c.high)) * (currentPriceUsd / currentPrice))
+                    : Math.max(...candles.map(c => c.high)).toFixed(6)}
+                </span>
+                <span className="text-red-400 ml-1">L</span>
+                <span className="text-blue-400">
+                  {priceMode === 'usd' && currentPriceUsd 
+                    ? formatUSD(Math.min(...candles.map(c => c.low)) * (currentPriceUsd / currentPrice))
+                    : Math.min(...candles.map(c => c.low)).toFixed(6)}
+                </span>
+                <span className="text-purple-400 ml-1">C</span>
+                <span className="text-[#AFFF00]">
+                  {priceMode === 'usd' && currentPriceUsd 
+                    ? formatUSD(candles[candles.length - 1].close * (currentPriceUsd / currentPrice))
+                    : candles[candles.length - 1].close.toFixed(6)}
+                </span>
+                <span className="text-emerald-400 ml-2">{showBubbles ? candles.length : '0'}</span>
+                <span className="text-gray-500">
+                  ({marketCapChangePercent24h !== undefined 
+                    ? `${marketCapChangePercent24h >= 0 ? '+' : ''}${marketCapChangePercent24h.toFixed(2)}%`
+                    : '+0.00%'})
+                </span>
+              </div>
+            )}
+            <div>
+              Volume <span className="text-white font-bold">
+                {priceMode === 'usd' && suiUsdPrice 
+                  ? formatUSD(totalVolume * suiUsdPrice) 
+                  : totalVolume.toFixed(4)}
+              </span>
+            </div>
           </div>
         </div>
         

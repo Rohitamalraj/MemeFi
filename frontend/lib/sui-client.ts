@@ -5,6 +5,7 @@ import { SuiClient } from '@mysten/sui.js/client';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { MEMEFI_CONFIG, CONTRACT_FUNCTIONS, getFunctionName } from './contract-config';
 import { getTokenImage } from './token-metadata';
+import { getSuiUsdPrice, calculateMarketCapUSD, getToken24hChange } from './price-feed';
 
 // Initialize Sui client
 export function getSuiClient(): SuiClient {
@@ -209,10 +210,16 @@ export interface MemeTokenData {
   creator: string;
   holderCount: number;
   totalVolume: number;
-  currentPrice: number;
-  marketCap: number;
-  priceChange24h?: number; // Calculated price change over 24h
+  currentPrice: number; // Price in SUI
+  marketCap: number; // Market cap in SUI
+  priceChange24h?: number; // Calculated price change over 24h (percentage)
   imageUrl?: string; // Optional image URL from Walrus or other source
+  // USD values
+  suiUsdPrice?: number; // Current SUI/USD exchange rate
+  currentPriceUsd?: number; // Token price in USD
+  marketCapUsd?: number; // Market cap in USD
+  marketCapChange24h?: number; // 24h market cap change in USD
+  marketCapChangePercent24h?: number; // 24h market cap change percentage
 }
 
 // Helper to calculate actual current phase based on time
@@ -363,6 +370,31 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
     // Get image URL from metadata storage
     const imageUrl = getTokenImage(object.data.objectId);
 
+    // Fetch USD prices and 24h changes
+    let suiUsdPrice: number | undefined;
+    let currentPriceUsd: number | undefined;
+    let marketCapUsd: number | undefined;
+    let marketCapChange24h: number | undefined;
+    let marketCapChangePercent24h: number | undefined;
+
+    try {
+      suiUsdPrice = await getSuiUsdPrice();
+      currentPriceUsd = currentPrice * suiUsdPrice;
+      marketCapUsd = calculateMarketCapUSD(circulatingSupply, currentPrice, suiUsdPrice);
+      
+      // Get 24h change data
+      const change24h = await getToken24hChange(
+        object.data.objectId,
+        currentPrice,
+        circulatingSupply
+      );
+      
+      marketCapChange24h = change24h.marketCapChange;
+      marketCapChangePercent24h = change24h.marketCapChangePercent;
+    } catch (error) {
+      console.error('Failed to fetch USD data:', error);
+    }
+
     return {
       id: object.data.objectId,
       name: fields.name || '',
@@ -383,6 +415,12 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
       marketCap: marketCap,
       priceChange24h: priceChange24h,
       imageUrl: imageUrl || undefined,
+      // USD values
+      suiUsdPrice,
+      currentPriceUsd,
+      marketCapUsd,
+      marketCapChange24h,
+      marketCapChangePercent24h,
     };
   } catch (error) {
     console.error('Failed to fetch token:', error);

@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useWalletConnection } from '@/lib/use-wallet'
 import { getSuiClient, getTokenById, getUserTokenBalance, MemeTokenData, withdrawToWalletTransaction } from '@/lib/sui-client'
+import { formatUSD } from '@/lib/price-feed'
 import { toast } from 'sonner'
 import { TransactionBlock } from '@mysten/sui.js/transactions'
 import { MEMEFI_CONFIG } from '@/lib/contract-config'
@@ -42,7 +43,8 @@ function formatNumber(num: number): string {
   if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K`
   if (num >= 1) return num.toFixed(2)
   if (num >= 0.01) return num.toFixed(4)
-  if (num > 0) return num.toFixed(6)
+  if (num >= 0.000001) return num.toFixed(8)
+  if (num > 0) return `< 0.000001`
   return '0.00'
 }
 
@@ -373,15 +375,28 @@ export default function TokenTradingPage() {
                   <div>
                     <div className="text-sm text-gray-400 mb-1">Market Cap</div>
                     <div className="font-black text-2xl text-[#AFFF00]">
-                      {formatNumber(token.marketCap)} SUI
+                      {token.marketCapUsd ? formatUSD(token.marketCapUsd) : `${formatNumber(token.marketCap)} SUI`}
                     </div>
+                    {token.marketCapChange24h !== undefined && token.marketCapChangePercent24h !== undefined && (
+                      <div className={`text-sm mt-1 flex items-center gap-1 ${
+                        token.marketCapChange24h >= 0 ? 'text-green-400' : 'text-red-400'
+                      }`}>
+                        {token.marketCapChange24h >= 0 ? '+' : ''}{formatUSD(token.marketCapChange24h)}
+                        {' '}({token.marketCapChange24h >= 0 ? '+' : ''}{token.marketCapChangePercent24h.toFixed(2)}%) 24hr
+                      </div>
+                    )}
                   </div>
 
                   <div>
                     <div className="text-sm text-gray-400 mb-1">Current Price</div>
                     <div className="font-bold text-xl text-white">
-                      {token.currentPrice.toFixed(6)} SUI
+                      {token.currentPriceUsd ? formatUSD(token.currentPriceUsd) : `${token.currentPrice.toFixed(6)} SUI`}
                     </div>
+                    {token.suiUsdPrice && (
+                      <div className="text-xs text-gray-400 mt-1">
+                        {token.currentPrice.toFixed(6)} SUI (${token.suiUsdPrice.toFixed(2)}/SUI)
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -519,6 +534,14 @@ export default function TokenTradingPage() {
               currentPhase={currentPhase}
               isPrivatePhase={currentPhase === 1}
               intervalMinutes={1}
+              marketCap={token.marketCap}
+              marketCapUsd={token.marketCapUsd}
+              marketCapChange24h={token.marketCapChange24h}
+              marketCapChangePercent24h={token.marketCapChangePercent24h}
+              totalVolume={token.totalVolume}
+              currentPrice={token.currentPrice}
+              currentPriceUsd={token.currentPriceUsd}
+              suiUsdPrice={token.suiUsdPrice}
             />
 
             {/* Trading Card */}
