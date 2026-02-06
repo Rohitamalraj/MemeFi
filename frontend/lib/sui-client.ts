@@ -4,6 +4,7 @@
 import { SuiClient } from '@mysten/sui.js/client';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { MEMEFI_CONFIG, CONTRACT_FUNCTIONS, getFunctionName } from './contract-config';
+import { getTokenImage } from './token-metadata';
 
 // Initialize Sui client
 export function getSuiClient(): SuiClient {
@@ -140,7 +141,57 @@ export async function getSessionInfo(sessionId: string) {
     return null;
   }
 }
+// Withdraw Tokens to Wallet Transaction
+export interface WithdrawToWalletParams {
+  tokenId: string;
+  treasuryCapId: string; // Shared TreasuryCap object ID for wrapped tokens
+  amount: number;
+}
 
+export function withdrawToWalletTransaction(params: WithdrawToWalletParams): TransactionBlock {
+  const txb = new TransactionBlock();
+  
+  console.log('🏦 Creating withdraw transaction:', params);
+  
+  txb.moveCall({
+    target: `${MEMEFI_CONFIG.packageId}::token_v2::withdraw_to_wallet`,
+    arguments: [
+      txb.object('0x6'), // Clock
+      txb.object(params.tokenId), // MemeToken object
+      txb.object(params.treasuryCapId), // TreasuryCap<WRAPPED_TOKEN>
+      txb.pure(params.amount, 'u64'),
+    ],
+  });
+  
+  console.log('✅ Withdraw transaction created');
+  return txb;
+}
+
+// Deposit Tokens from Wallet Transaction
+export interface DepositFromWalletParams {
+  tokenId: string;
+  treasuryCapId: string;
+  coinObjectId: string; // The Coin<WRAPPED_TOKEN> object to deposit
+}
+
+export function depositFromWalletTransaction(params: DepositFromWalletParams): TransactionBlock {
+  const txb = new TransactionBlock();
+  
+  console.log('💰 Creating deposit transaction:', params);
+  
+  txb.moveCall({
+    target: `${MEMEFI_CONFIG.packageId}::token_v2::deposit_from_wallet`,
+    arguments: [
+      txb.object('0x6'), // Clock
+      txb.object(params.tokenId), // MemeToken object
+      txb.object(params.treasuryCapId), // TreasuryCap<WRAPPED_TOKEN>
+      txb.object(params.coinObjectId), // Coin<WRAPPED_TOKEN>
+    ],
+  });
+  
+  console.log('✅ Deposit transaction created');
+  return txb;
+}
 // Fetch all MemeToken objects from blockchain
 export interface MemeTokenData {
   id: string;
@@ -161,6 +212,7 @@ export interface MemeTokenData {
   currentPrice: number;
   marketCap: number;
   priceChange24h?: number; // Calculated price change over 24h
+  imageUrl?: string; // Optional image URL from Walrus or other source
 }
 
 // Helper to calculate actual current phase based on time
@@ -285,6 +337,9 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
     const initialPrice = basePrice;
     const priceChange24h = ((currentPrice - initialPrice) / initialPrice) * 100;
 
+    // Get image URL from metadata storage
+    const imageUrl = getTokenImage(object.data.objectId);
+
     return {
       id: object.data.objectId,
       name: fields.name || '',
@@ -304,6 +359,7 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
       currentPrice: currentPrice,
       marketCap: marketCap,
       priceChange24h: priceChange24h,
+      imageUrl: imageUrl || undefined,
     };
   } catch (error) {
     console.error('Failed to fetch token:', error);

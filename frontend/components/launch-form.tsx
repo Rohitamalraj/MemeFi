@@ -2,12 +2,15 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Rocket, Info, Shield, Clock, Users, TrendingUp, CheckCircle, AlertCircle, ExternalLink } from "lucide-react"
+import { Rocket, Info, Shield, Clock, Users, TrendingUp, CheckCircle, AlertCircle, ExternalLink, Upload, X, Image as ImageIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useTokenLaunch } from "@/lib/use-contracts"
 import { useWalletConnection } from "@/lib/use-wallet"
 import { getExplorerUrl } from "@/lib/contract-config"
+import { uploadImage, validateImageFile } from "@/lib/walrus"
+import { saveTokenImage, getTokenImage } from "@/lib/token-metadata"
+import { toast } from "sonner"
 
 interface LaunchFormData {
   tokenName: string
@@ -51,8 +54,39 @@ export function LaunchForm() {
     restrictTransfers: true,
   })
 
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+
   const handleInputChange = (field: keyof LaunchFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file
+    const validation = validateImageFile(file)
+    if (!validation.valid) {
+      toast.error(validation.error || 'Invalid image file')
+      return
+    }
+
+    // Set file and create preview
+    setImageFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+    toast.success('Image selected! Tip: Add a backup URL below in case Walrus upload fails.', { duration: 4000 })
+  }
+
+  const handleRemoveImage = () => {
+    setImageFile(null)
+    setImagePreview(null)
+    setFormData(prev => ({ ...prev, imageUrl: '' }))
   }
 
   const handleLaunch = async () => {
@@ -67,32 +101,113 @@ export function LaunchForm() {
 
     console.log('✅ Wallet connected, preparing transaction...');
 
-    const totalSupply = Number.parseInt(formData.totalSupply)
-    const maxBuyPerWallet = Number.parseInt(formData.maxBuyPerWallet)
-    
-    // Calculate durations in milliseconds
-    // Early phase duration (LAUNCH phase only)
-    const earlyPhaseDurationMs = Math.floor(parseFloat(formData.earlyPhaseDuration) * 60 * 60 * 1000)
-    // Session/phase duration (for PRIVATE, SETTLEMENT, and beyond)
-    const phaseDurationMs = Math.floor(parseFloat(formData.sessionDuration) * 60 * 60 * 1000)
+    try {
+      // Upload image to Walrus first if an image file is selected
+      let imageUrl = formData.imageUrl // Start with any direct URL provided
+      
+      if (imageFile) {
+        setIsUploadingImage(true)
+        toast.info('Uploading image to Walrus...', { duration: 3000 })
+        console.log('📤 Uploading image to Walrus:', imageFile.name)
+        
+        try {
+          const walrusUrl = await uploadImage(imageFile, 5) // Store for 5 epochs
+          console.log('✅ Image uploaded to Walrus:', walrusUrl)
+          toast.success('Image uploaded to Walrus!')
+          imageUrl = walrusUrl // Use Walrus URL if successful
+          
+          // Store the Walrus URL in form data for future reference
+          setFormData(prev => ({ ...prev, imageUrl: walrusUrl }))
+        } catch (uploadError) {
+          console.error('❌ Image upload failed:', uploadError)
+          
+          // If we have a fallback URL from the input field, use that
+          if (formData.imageUrl) {
+            toast.warning('Walrus upload failed. Using provided URL instead.')
+            imageUrl = formData.imageUrl
+          } else {
+            toast.error('Failed to upload image to Walrus. Launching without image.')
+            imageUrl = '' // Continue without image
+          }
+        } finally {
+          setIsUploadingImage(false)
+        }
+      }
 
-    const launchParams = {
-      name: formData.tokenName,
-      symbol: formData.tokenSymbol,
-      totalSupply,
-      maxBuyPerWallet,
-      earlyPhaseDurationMs,
-      phaseDurationMs,
-      transfersLocked: formData.restrictTransfers,
-    };
+      const totalSupply = Number.parseInt(formData.totalSupply)
+      const maxBuyPerWallet = Number.parseInt(formData.maxBuyPerWallet)
+      
+      // Calculate durations in milliseconds
+      // Early phase duration (LAUNCH phase only)
+      const earlyPhaseDurationMs = Math.floor(parseFloat(formData.earlyPhaseDuration) * 60 * 60 * 1000)
+      // Session/phase duration (for PRIVATE, SETTLEMENT, and beyond)
+      const phaseDurationMs = Math.floor(parseFloat(formData.sessionDuration) * 60 * 60 * 1000)
 
-    console.log('📋 Launch parameters:', launchParams);
-    console.log(`  Early phase (LAUNCH): ${earlyPhaseDurationMs}ms (${earlyPhaseDurationMs/1000/60} minutes)`);
-    console.log(`  Session phase (PRIVATE): ${phaseDurationMs}ms (${phaseDurationMs/1000/60} minutes)`);
+      const launchParams = {
+        name: formData.tokenName,
+        symbol: formData.tokenSymbol,
+        totalSupply,
+        maxBuyPerWallet,
+        earlyPhaseDurationMs,
+        phaseDurationMs,
+        transfersLocked: formData.restrictTransfers,
+      };
 
-    const result = await launchToken(launchParams);
-    
-    console.log('🎯 Launch result:', result);
+      console.log('📋 Launch parameters:', launchParams);
+      console.log(`  Early phase (LAUNCH): ${earlyPhaseDurationMs}ms (${earlyPhaseDurationMs/1000/60} minutes)`);
+      console.log(`  Session phase (PRIVATE): ${phaseDurationMs}ms (${phaseDurationMs/1000/60} minutes)`);
+      console.log(`  Image URL: ${imageUrl}`);
+
+      const result = await launchToken(launchParams);
+      
+      console.log('🎯 Launch result:', result);      
+      // If launch successful and we have an image URL, save it to metadata
+      if (result.success && imageUrl && result.objectChanges) {
+        try {
+          console.log('🔍 All object changes:', JSON.stringify(result.objectChanges, null, 2));
+          
+          // Find the created token object - simplified pattern matching
+          const createdObject = result.objectChanges.find(
+            (change: any) => 
+              change.type === 'created' && 
+              change.objectType?.includes('MemeToken')
+          );
+          
+          if (createdObject) {
+            const tokenId = createdObject.objectId;
+            console.log('✅ Token found with ID:', tokenId);
+            console.log('💾 Saving image URL:', imageUrl);
+            saveTokenImage(tokenId, imageUrl);
+            console.log('✅ Metadata saved to localStorage');
+            
+            // Verify the save
+            const saved = getTokenImage(tokenId);
+            console.log('🔍 Verification - retrieved from storage:', saved);
+            toast.success('Token metadata saved!');
+          } else {
+            console.warn('⚠️ Could not find MemeToken object');
+            console.log('📋 Available objects:', result.objectChanges.map((c: any) => ({ 
+              type: c.type, 
+              objectType: c.objectType,
+              objectId: c.objectId 
+            })));
+            
+            // Fallback: Use first created object
+            const anyCreated = result.objectChanges.find((change: any) => change.type === 'created');
+            if (anyCreated) {
+              console.log('🔄 Using fallback object:', anyCreated.objectId);
+              saveTokenImage(anyCreated.objectId, imageUrl);
+              toast.success('Token metadata saved (fallback)!');
+            }
+          }
+        } catch (metadataError) {
+          console.error('❌ Error saving token metadata:', metadataError);
+          // Don't fail the launch if metadata save fails
+        }
+      }    } catch (error) {
+      console.error('❌ Launch error:', error)
+      toast.error('Failed to launch token')
+    }
   }
 
   const steps = [
@@ -274,15 +389,101 @@ export function LaunchForm() {
 
                       <div>
                         <label className="block text-sm font-bold text-[#121212] mb-2">
-                          Image URL
+                          Token Image
                         </label>
-                        <input
-                          type="text"
-                          value={formData.imageUrl}
-                          onChange={(e) => handleInputChange("imageUrl", e.target.value)}
-                          placeholder="https://..."
-                          className="w-full px-4 py-3 border-2 border-[#121212]/20 rounded-xl focus:border-[#AFFF00] focus:outline-none transition-colors"
-                        />
+                        
+                        {!imagePreview ? (
+                          <div className="space-y-3">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageSelect}
+                              className="hidden"
+                              id="image-upload"
+                            />
+                            <label
+                              htmlFor="image-upload"
+                              className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-[#121212]/20 rounded-xl hover:border-[#AFFF00] transition-colors cursor-pointer bg-[#AFFF00]/5 hover:bg-[#AFFF00]/10"
+                            >
+                              <Upload className="w-10 h-10 text-[#121212]/40 mb-2" />
+                              <p className="text-sm font-medium text-[#121212]/70">Click to upload image</p>
+                              <p className="text-xs text-[#121212]/50 mt-1">PNG, JPG, GIF, WebP or SVG (max 10MB)</p>
+                              <p className="text-xs text-[#AFFF00] font-bold mt-2">🔒 Will upload to Walrus Storage</p>
+                            </label>
+                            
+                            <div className="relative">
+                              <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-[#121212]/20"></div>
+                              </div>
+                              <div className="relative flex justify-center text-xs">
+                                <span className="bg-white px-2 text-[#121212]/50">OR use direct URL</span>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={formData.imageUrl}
+                                onChange={(e) => handleInputChange("imageUrl", e.target.value)}
+                                placeholder="https://i.imgur.com/yourimage.png"
+                                className="w-full px-4 py-3 border-2 border-[#121212]/20 rounded-xl focus:border-[#AFFF00] focus:outline-none transition-colors"
+                              />
+                              <p className="text-xs text-[#121212]/50">
+                                💡 <strong>Recommended:</strong> Use a direct image URL from Imgur, Cloudinary, or GitHub. 
+                                Walrus testnet may be temporarily unavailable.
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="relative w-full h-40 rounded-xl overflow-hidden border-2 border-[#AFFF00] group">
+                              <img
+                                src={imagePreview}
+                                alt="Preview"
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Button
+                                  type="button"
+                                  onClick={handleRemoveImage}
+                                  className="bg-red-500 hover:bg-red-600 text-white rounded-full p-2"
+                                  size="sm"
+                                >
+                                  <X className="w-5 h-5" />
+                                </Button>
+                              </div>
+                              <div className="absolute bottom-2 left-2 bg-[#AFFF00] text-[#121212] text-xs font-bold px-2 py-1 rounded">
+                                ✓ Ready for Walrus
+                              </div>
+                            </div>
+                            
+                            <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-3">
+                              <p className="text-xs font-bold text-orange-900 mb-2">
+                                ⚠️ Add Backup URL (Highly Recommended)
+                              </p>
+                              <input
+                                type="text"
+                                value={formData.imageUrl}
+                                onChange={(e) => handleInputChange("imageUrl", e.target.value)}
+                                placeholder="https://i.imgur.com/yourimage.png (backup if Walrus fails)"
+                                className="w-full px-4 py-2 border-2 border-orange-200 rounded-lg focus:border-orange-400 focus:outline-none transition-colors text-sm"
+                              />
+                              <p className="text-xs text-orange-800 mt-1">
+                                If the Walrus upload fails, this URL will be used instead.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-2">
+                          <p className="text-xs text-blue-900">
+                            <strong>📸 Image Options:</strong>
+                          </p>
+                          <ul className="text-xs text-blue-800 mt-1 ml-4 list-disc space-y-1">
+                            <li><strong>Recommended:</strong> Paste a direct image URL (instant, reliable)</li>
+                            <li>Upload file: We'll try Walrus storage (experimental, may fail)</li>
+                            <li>If Walrus fails, your fallback URL will be used automatically</li>
+                          </ul>
+                        </div>
                       </div>
 
                       <Button

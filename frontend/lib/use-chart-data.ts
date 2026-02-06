@@ -65,9 +65,22 @@ function aggregateCandles(trades: Trade[], intervalSeconds: number): CandleData[
     const prices = intervalTrades.map(t => t.price)
     const open = intervalTrades[0].price
     const close = intervalTrades[intervalTrades.length - 1].price
-    const high = Math.max(...prices)
-    const low = Math.min(...prices)
+    let high = Math.max(...prices)
+    let low = Math.min(...prices)
     const volume = intervalTrades.reduce((sum, t) => sum + t.amount, 0)
+
+    // Ensure high/low create visible wicks (at least 0.1% variation)
+    // This prevents candlesticks from looking like blocks
+    if (high === low || (high - low) / low < 0.001) {
+      const midpoint = (high + low) / 2
+      high = midpoint * 1.0005  // +0.05% for high
+      low = midpoint * 0.9995   // -0.05% for low
+    }
+    
+    // Ensure high is above both open and close
+    high = Math.max(high, open, close)
+    // Ensure low is below both open and close
+    low = Math.min(low, open, close)
 
     candles.push({ time, open, high, low, close, volume })
   }
@@ -75,12 +88,12 @@ function aggregateCandles(trades: Trade[], intervalSeconds: number): CandleData[
   return candles.sort((a, b) => a.time - b.time)
 }
 
-// Generate volume data with colors based on price change
+// Generate volume data with colors based on price change (pump.fun style)
 function generateVolumeData(candles: CandleData[]): VolumeData[] {
   return candles.map(candle => ({
     time: candle.time,
     value: candle.volume,
-    color: candle.close >= candle.open ? 'rgba(175, 255, 0, 0.6)' : 'rgba(255, 82, 82, 0.6)'
+    color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
   }))
 }
 

@@ -9,6 +9,8 @@ export interface TransactionResult {
   success: boolean;
   digest?: string;
   error?: string;
+  effects?: any;
+  objectChanges?: any[];
 }
 
 export function useWalletConnection() {
@@ -47,10 +49,16 @@ export function useWalletConnection() {
       // Check if transaction was successful
       if (result.digest) {
         console.log('✅ Transaction successful! Digest:', result.digest);
+        console.log('📦 Object changes:', result.objectChanges);
         if (successMessage) {
           toast.success(successMessage);
         }
-        return { success: true, digest: result.digest };
+        return { 
+          success: true, 
+          digest: result.digest,
+          effects: result.effects,
+          objectChanges: result.objectChanges || undefined,
+        };
       } else {
         const error = 'Transaction failed';
         console.error('❌ Transaction failed:', error);

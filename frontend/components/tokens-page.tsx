@@ -82,6 +82,7 @@ function convertToDisplayToken(tokenData: MemeTokenData): Token {
     id: tokenData.id,
     name: tokenData.name,
     symbol: tokenData.symbol,
+    image: tokenData.imageUrl, // Add image from metadata
     // Use calculated values from blockchain
     price: tokenData.currentPrice,
     priceChange24h: tokenData.priceChange24h || 0, // Use calculated price change
@@ -105,9 +106,28 @@ function TokenCard({ token }: { token: Token }) {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-[#AFFF00] to-[#7AB800] rounded-xl flex items-center justify-center font-black text-xl text-[#121212]">
-                  {token.symbol.slice(0, 2)}
-                </div>
+                {token.image ? (
+                  <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-[#AFFF00]/20">
+                    <img 
+                      src={token.image} 
+                      alt={token.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to initials if image fails to load
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling;
+                        if (fallback) fallback.classList.remove('hidden');
+                      }}
+                    />
+                    <div className="hidden w-12 h-12 bg-gradient-to-br from-[#AFFF00] to-[#7AB800] rounded-xl flex items-center justify-center font-black text-xl text-[#121212]">
+                      {token.symbol.slice(0, 2)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#AFFF00] to-[#7AB800] rounded-xl flex items-center justify-center font-black text-xl text-[#121212]">
+                    {token.symbol.slice(0, 2)}
+                  </div>
+                )}
                 <div>
                   <h3 className="font-bold text-lg text-[#121212] group-hover:text-[#AFFF00] transition-colors">
                     {token.name}

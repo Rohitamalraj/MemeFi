@@ -46,82 +46,73 @@ export function TradingChart({
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: '#ffffff' },
-        textColor: '#121212',
+        background: { type: ColorType.Solid, color: '#0f0f0f' },
+        textColor: '#d1d4dc',
       },
       grid: {
-        vertLines: { color: '#e0e0e0', style: 1, visible: true },
-        horzLines: { color: '#e0e0e0', style: 1, visible: true },
+        vertLines: { color: '#1e1e1e', style: 0, visible: true },
+        horzLines: { color: '#1e1e1e', style: 0, visible: true },
       },
       width: chartContainerRef.current.clientWidth,
-      height: 400,
+      height: 450,
       timeScale: {
         timeVisible: true,
-        secondsVisible: true,
-        borderColor: '#d1d4dc',
+        secondsVisible: false,
+        borderColor: '#2b2b2b',
         fixLeftEdge: true,
         fixRightEdge: true,
       },
       rightPriceScale: {
-        borderColor: '#d1d4dc',
+        borderColor: '#2b2b2b',
         autoScale: true,
         scaleMargins: {
           top: 0.1,
-          bottom: 0.1,
+          bottom: 0.2,
         },
       },
       crosshair: {
         mode: 1,
         vertLine: {
-          color: '#AFFF00',
+          color: '#758696',
           width: 1,
-          style: 3,
-          labelBackgroundColor: '#AFFF00',
+          style: 2,
+          labelBackgroundColor: '#363c4e',
         },
         horzLine: {
-          color: '#AFFF00',
+          color: '#758696',
           width: 1,
-          style: 3,
-          labelBackgroundColor: '#AFFF00',
+          style: 2,
+          labelBackgroundColor: '#363c4e',
         },
       },
     })
 
     chartRef.current = chart
 
-    // Add candlestick series
+    // Add candlestick series with pump.fun style colors
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#AFFF00',
-      downColor: '#ff5252',
-      borderUpColor: '#7AB800',
-      borderDownColor: '#d32f2f',
-      wickUpColor: '#7AB800',
-      wickDownColor: '#d32f2f',
-      priceLineVisible: true,
-      lastValueVisible: true,
-      priceFormat: {
-        type: 'price',
-        precision: 8,
-        minMove: 0.00000001,
-      },
+      upColor: '#26a69a',
+      downColor: '#ef5350',
+      borderUpColor: '#26a69a',
+      borderDownColor: '#ef5350',
+      wickUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
     })
 
     candleSeriesRef.current = candleSeries
 
-    // Add volume series
+    // Add volume series with better visibility  
     const volumeSeries = chart.addSeries(HistogramSeries, {
-      color: '#AFFF00',
+      color: '#26a69a',
       priceFormat: {
         type: 'volume',
       },
       priceScaleId: '',
-      lastValueVisible: false,
-      priceLineVisible: false,
     })
 
     volumeSeries.priceScale().applyOptions({
       scaleMargins: {
-        top: 0.8,
+        top: 0.7,
         bottom: 0,
       },
     })
@@ -184,25 +175,25 @@ export function TradingChart({
   }, [candles, volumeData])
 
   return (
-    <Card className="border-2">
+    <Card className="border-2 bg-[#0f0f0f]">
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-[#121212] flex items-center gap-2">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-[#AFFF00]" />
             Price Chart
           </h3>
-          <div className="text-xs text-[#121212]/50 font-mono">
+          <div className="text-xs text-gray-400 font-mono">
             {candles.length} candles • {intervalMinutes}m interval
           </div>
         </div>
         
         {/* Always render chart container so ref is available for initialization */}
-        <div className="relative h-[400px]">
+        <div className="relative h-[450px] rounded-lg overflow-hidden">
           <div ref={chartContainerRef} className="w-full h-full" />
           
           {/* Overlay: Private Phase */}
           {isPrivatePhase && (
-            <div className="absolute inset-0 bg-gradient-to-br from-[#AFFF00]/5 to-white/95 flex items-center justify-center rounded">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0f0f0f] to-[#1e1e1e] flex items-center justify-center rounded">
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -212,51 +203,51 @@ export function TradingChart({
                   <Lock className="w-8 h-8 text-[#AFFF00]" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-[#121212] mb-1">
+                  <h3 className="text-lg font-black text-white mb-1">
                     Private Session in Progress
                   </h3>
-                  <p className="text-sm text-[#121212]/60 max-w-xs mx-auto">
+                  <p className="text-sm text-gray-400 max-w-xs mx-auto">
                     Chart data hidden during private phase
                   </p>
                 </div>
-                <div className="inline-flex items-center gap-2 bg-[#AFFF00]/20 px-3 py-1.5 rounded-full text-xs font-bold text-[#121212]">
+                <div className="inline-flex items-center gap-2 bg-[#AFFF00]/20 px-3 py-1.5 rounded-full text-xs font-bold text-white">
                   <Clock className="w-3 h-3" />
                   Reveals after settlement
                 </div>
               </motion.div>
             </div>
-          )}
+          )})
           
           {/* Overlay: Loading */}
           {!isPrivatePhase && loading && (
-            <div className="absolute inset-0 bg-white/95 flex items-center justify-center rounded">
+            <div className="absolute inset-0 bg-[#0f0f0f]/95 flex items-center justify-center rounded">
               <div className="text-center">
                 <div className="w-12 h-12 border-4 border-[#AFFF00] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-sm text-[#121212]/60">Loading chart data...</p>
+                <p className="text-sm text-gray-400">Loading chart data...</p>
               </div>
             </div>
           )}
           
           {/* Overlay: Error */}
           {!isPrivatePhase && !loading && error && (
-            <div className="absolute inset-0 bg-red-50/95 flex items-center justify-center rounded">
+            <div className="absolute inset-0 bg-[#1e1e1e]/95 flex items-center justify-center rounded">
               <div className="text-center">
-                <p className="text-red-600 font-medium">Failed to load chart</p>
-                <p className="text-xs text-red-400 mt-1">{error}</p>
+                <p className="text-red-400 font-medium">Failed to load chart</p>
+                <p className="text-xs text-red-300/60 mt-1">{error}</p>
               </div>
             </div>
           )}
           
           {/* Overlay: Empty State */}
           {!isPrivatePhase && !loading && !error && isEmpty && (
-            <div className="absolute inset-0 bg-white/95 flex items-center justify-center rounded">
+            <div className="absolute inset-0 bg-[#0f0f0f]/95 flex items-center justify-center rounded">
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 mx-auto bg-[#121212]/5 rounded-full flex items-center justify-center">
-                  <TrendingUp className="w-8 h-8 text-[#121212]/30" />
+                <div className="w-16 h-16 mx-auto bg-gray-800/50 rounded-full flex items-center justify-center">
+                  <TrendingUp className="w-8 h-8 text-gray-500" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#121212] mb-1">No Trading History Yet</h3>
-                  <p className="text-sm text-[#121212]/60">
+                  <h3 className="text-lg font-bold text-white mb-1">No Trading History Yet</h3>
+                  <p className="text-sm text-gray-400">
                     Be the first to trade {tokenSymbol}!
                   </p>
                 </div>
@@ -265,14 +256,14 @@ export function TradingChart({
           )}
         </div>
         
-        <div className="mt-4 flex items-center justify-between text-xs text-[#121212]/50">
+        <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-[#AFFF00] rounded"></div>
+              <div className="w-3 h-3 bg-[#26a69a] rounded"></div>
               <span>Up</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-[#ff5252] rounded"></div>
+              <div className="w-3 h-3 bg-[#ef5350] rounded"></div>
               <span>Down</span>
             </div>
           </div>
