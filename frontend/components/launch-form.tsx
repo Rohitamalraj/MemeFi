@@ -69,20 +69,26 @@ export function LaunchForm() {
 
     const totalSupply = Number.parseInt(formData.totalSupply)
     const maxBuyPerWallet = Number.parseInt(formData.maxBuyPerWallet)
-    // Use session duration as the base - all phases will be this length
-    // Use parseFloat to handle decimal hours like 0.05
-    const phaseDurationMs = Math.floor(parseFloat(formData.sessionDuration) * 60 * 60 * 1000) // Convert hours to milliseconds
+    
+    // Calculate durations in milliseconds
+    // Early phase duration (LAUNCH phase only)
+    const earlyPhaseDurationMs = Math.floor(parseFloat(formData.earlyPhaseDuration) * 60 * 60 * 1000)
+    // Session/phase duration (for PRIVATE, SETTLEMENT, and beyond)
+    const phaseDurationMs = Math.floor(parseFloat(formData.sessionDuration) * 60 * 60 * 1000)
 
     const launchParams = {
       name: formData.tokenName,
       symbol: formData.tokenSymbol,
       totalSupply,
       maxBuyPerWallet,
+      earlyPhaseDurationMs,
       phaseDurationMs,
       transfersLocked: formData.restrictTransfers,
     };
 
     console.log('📋 Launch parameters:', launchParams);
+    console.log(`  Early phase (LAUNCH): ${earlyPhaseDurationMs}ms (${earlyPhaseDurationMs/1000/60} minutes)`);
+    console.log(`  Session phase (PRIVATE): ${phaseDurationMs}ms (${phaseDurationMs/1000/60} minutes)`);
 
     const result = await launchToken(launchParams);
     
