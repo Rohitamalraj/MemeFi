@@ -6,7 +6,7 @@ export const MEMEFI_CONFIG = {
   network: 'testnet', // 'devnet' | 'testnet' | 'mainnet'
   
   // Contract addresses (update after deployment)
-  packageId: '0x2fcb87a8ee0c49042621bd03e7a18defc4c46afd5eecc40947f3a48d2b1c1b39',
+  packageId: '0xea7d648351f216544ed0db53b51256490ab18e0d6965cebcfbc40abcae84a88b',
   
   // Module names
   modules: {

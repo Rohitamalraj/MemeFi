@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useWalletConnection } from '@/lib/use-wallet'
-import { getSuiClient, getTokenById, getUserTokenBalance, MemeTokenData, withdrawToWalletTransaction } from '@/lib/sui-client'
+import { getSuiClient, getTokenById, getUserTokenBalance, MemeTokenData, withdrawToWalletTransaction, getTopTokenHolders, TokenHolder } from '@/lib/sui-client'
 import { formatUSD } from '@/lib/price-feed'
 import { toast } from 'sonner'
 import { TransactionBlock } from '@mysten/sui.js/transactions'
@@ -85,6 +85,8 @@ export default function TokenTradingPage() {
   const [isTrading, setIsTrading] = useState(false)
   const [userBalance, setUserBalance] = useState(0)
   const [timeRemaining, setTimeRemaining] = useState(0)
+  const [holders, setHolders] = useState<TokenHolder[]>([])
+  const [loadingHolders, setLoadingHolders] = useState(true)
 
   // Fetch token data
   useEffect(() => {
@@ -147,6 +149,19 @@ export default function TokenTradingPage() {
     fetchBalance()
   }, [address, token])
 
+  // Fetch top holders
+  useEffect(() => {
+    async function fetchHolders() {
+      if (token) {
+        setLoadingHolders(true)
+        const topHolders = await getTopTokenHolders(token.id, 20)
+        setHolders(topHolders)
+        setLoadingHolders(false)
+      }
+    }
+    fetchHolders()
+  }, [token])
+
   const handleTrade = async () => {
     if (!address) {
       toast.error('Please connect your wallet')
@@ -163,26 +178,32 @@ export default function TokenTradingPage() {
     setIsTrading(true)
 
     try {
-      // Calculate how many tokens user will get for the SUI amount
-      const tokensToGet = parseFloat(suiAmount) / token.currentPrice
-      const amountInUnits = Math.floor(tokensToGet * 1_000_000_000) // Convert to base units
-
       if (tradeType === 'buy') {
-        // Buy tokens
+        // Buy tokens with SUI payment
         const txb = new TransactionBlock()
         
+        // Convert SUI amount to MIST (smallest unit: 1 SUI = 1,000,000,000 MIST)
+        const suiAmountMist = Math.floor(parseFloat(suiAmount) * 1_000_000_000)
+        
+        // Split coins from user's wallet to pay for tokens
+        const [paymentCoin] = txb.splitCoins(
+          txb.gas,
+          [txb.pure(suiAmountMist, 'u64')]
+        )
+        
+        // Call buy_tokens with SUI payment
         txb.moveCall({
           target: `${MEMEFI_CONFIG.packageId}::token_v2::buy_tokens`,
           arguments: [
             txb.object('0x6'), // Clock object
             txb.object(tokenId), // Token object
-            txb.pure(amountInUnits, 'u64'),
+            paymentCoin, // Coin<SUI> payment
           ],
         })
 
         const result = await executeTransaction(
           txb,
-          `Successfully purchased ${formatNumber(tokensToGet)} ${token.symbol} for ${parseFloat(suiAmount).toFixed(4)} SUI!`
+          `Successfully purchased tokens for ${parseFloat(suiAmount).toFixed(4)} SUI!`
         )
 
         if (result.success) {
@@ -198,10 +219,45 @@ export default function TokenTradingPage() {
           }
         }
       } else {
-        // Sell functionality would go here
-        // Note: The current contract doesn't have a sell function
-        // You would need to implement token transfer or a DEX integration
-        toast.info('Sell functionality coming soon!')
+        // Sell tokens back to bonding curve
+        const tokensToSell = parseFloat(suiAmount) / token.currentPrice
+        
+        // Check balance BEFORE converting to base units
+        if (tokensToSell > userBalance) {
+          toast.error('Insufficient token balance')
+          return
+        }
+        
+        const amountInUnits = Math.floor(tokensToSell * 1_000_000_000) // Convert to base units
+
+        const txb = new TransactionBlock()
+        
+        txb.moveCall({
+          target: `${MEMEFI_CONFIG.packageId}::token_v2::sell_tokens`,
+          arguments: [
+            txb.object('0x6'), // Clock object
+            txb.object(tokenId), // Token object
+            txb.pure(amountInUnits, 'u64'), // Amount to sell
+          ],
+        })
+
+        const result = await executeTransaction(
+          txb,
+          `Successfully sold ${formatNumber(tokensToSell)} ${token.symbol}!`
+        )
+
+        if (result.success) {
+          setSuiAmount('')
+          // Refresh token data and balance
+          const updatedToken = await getTokenById(tokenId)
+          if (updatedToken) setToken(updatedToken)
+          
+          // Refresh user balance
+          if (address) {
+            const balance = await getUserTokenBalance(tokenId, address)
+            setUserBalance(balance)
+          }
+        }
       }
     } catch (error: any) {
       console.error('Trade error:', error)
@@ -489,6 +545,55 @@ export default function TokenTradingPage() {
               </CardContent>
             </Card>
 
+            {/* Top Holders Card */}
+            <Card className="border-2 border-gray-800 bg-[#0f0f0f]">
+              <CardContent className="pt-6">
+                <h3 className="font-bold text-lg mb-4 text-white flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Top Holders
+                </h3>
+                
+                {loadingHolders ? (
+                  <div className="text-center py-8 text-gray-400">Loading holders...</div>
+                ) : holders.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">No holders yet</div>
+                ) : (
+                  <div className="space-y-2">
+                    {holders.map((holder, index) => (
+                      <div
+                        key={holder.address}
+                        className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg border border-gray-800 hover:border-[#AFFF00]/20 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                            index === 0 ? 'bg-yellow-500/20 text-yellow-500' :
+                            index === 1 ? 'bg-gray-400/20 text-gray-400' :
+                            index === 2 ? 'bg-orange-500/20 text-orange-500' :
+                            'bg-gray-700 text-gray-400'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <div>
+                            <div className="font-mono text-sm text-white">
+                              {holder.address.slice(0, 6)}...{holder.address.slice(-4)}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {formatNumber(holder.balance)} {token.symbol}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-[#AFFF00]">
+                            {holder.percentage.toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Withdraw to Wallet Card - Only show in OPEN phase with balance */}
             {currentPhase === 3 && address && userBalance > 0 && (
               <Card className="border-2 border-green-800 bg-gradient-to-br from-green-900/10 to-[#0f0f0f]">
@@ -570,17 +675,16 @@ export default function TokenTradingPage() {
                           ? 'bg-red-500 text-white hover:bg-red-600'
                           : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                       }`}
-                      disabled
                     >
                       <TrendingDown className="w-4 h-4 mr-2" />
-                      Sell (Coming Soon)
+                      Sell
                     </Button>
                   </div>
 
                   {/* SUI Amount Input */}
                   <div className="mb-4">
                     <label className="block text-sm font-bold text-white mb-2">
-                      Pay with SUI
+                      {tradeType === 'buy' ? 'Pay with SUI' : 'Receive SUI'}
                     </label>
                     <input
                       type="number"
@@ -616,7 +720,9 @@ export default function TokenTradingPage() {
                   {suiAmount && parseFloat(suiAmount) > 0 && (
                     <div className="bg-gradient-to-r from-[#AFFF00]/10 to-[#AFFF00]/5 rounded-lg p-4 mb-4 border border-[#AFFF00]/20">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-400">You will receive</span>
+                        <span className="text-sm text-gray-400">
+                          {tradeType === 'buy' ? 'You will receive' : 'You will send'}
+                        </span>
                         <div className="text-right">
                           <div className="text-xl font-black text-[#AFFF00]">
                             {formatNumber(parseFloat(suiAmount) / token.currentPrice)} {token.symbol}
@@ -644,8 +750,8 @@ export default function TokenTradingPage() {
                       : isTrading
                       ? 'Processing...'
                       : suiAmount && parseFloat(suiAmount) > 0
-                      ? `Buy ${formatNumber(parseFloat(suiAmount) / token.currentPrice)} ${token.symbol}`
-                      : `Buy ${token.symbol}`}
+                      ? `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${formatNumber(parseFloat(suiAmount) / token.currentPrice)} ${token.symbol}`
+                      : `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${token.symbol}`}
                   </Button>
 
                   {/* Phase 0 (LAUNCH) - No Trading Banner */}

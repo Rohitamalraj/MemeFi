@@ -29,9 +29,16 @@ export function createTokenTransaction(params: CreateTokenParams): TransactionBl
   
   const decimals = params.decimals ?? 9; // Default to 9 decimals for SUI
   
+  // Convert human-readable amounts to base units
+  const decimalsMultiplier = Math.pow(10, decimals);
+  const totalSupplyBaseUnits = Math.floor(params.totalSupply * decimalsMultiplier);
+  const maxBuyBaseUnits = Math.floor(params.maxBuyPerWallet * decimalsMultiplier);
+  
   console.log('Creating token transaction with params:', {
     ...params,
     decimals,
+    totalSupplyBaseUnits,
+    maxBuyBaseUnits,
   });
   
   // Convert strings to byte arrays
@@ -51,8 +58,8 @@ export function createTokenTransaction(params: CreateTokenParams): TransactionBl
       txb.pure(nameBytes, 'vector<u8>'),
       txb.pure(symbolBytes, 'vector<u8>'),
       txb.pure(decimals, 'u8'),
-      txb.pure(params.totalSupply, 'u64'),
-      txb.pure(params.maxBuyPerWallet, 'u64'),
+      txb.pure(totalSupplyBaseUnits, 'u64'),
+      txb.pure(maxBuyBaseUnits, 'u64'),
       txb.pure(params.earlyPhaseDurationMs, 'u64'), // Early phase duration (LAUNCH)
       txb.pure(params.phaseDurationMs, 'u64'), // Session phase duration (PRIVATE/SETTLEMENT/etc)
       txb.pure(params.transfersLocked, 'bool'),
@@ -400,9 +407,9 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
       name: fields.name || '',
       symbol: fields.symbol || '',
       decimals: Number(fields.decimals || 9),
-      totalSupply: totalSupply,
-      circulatingSupply: circulatingSupply,
-      maxBuyPerWallet: Number(fields.max_buy_per_wallet || 0),
+      totalSupply: totalSupply / 1_000_000_000, // Convert from base units to tokens
+      circulatingSupply: circulatingTokens, // Already converted above
+      maxBuyPerWallet: Number(fields.max_buy_per_wallet || 0) / 1_000_000_000, // Convert from base units to tokens
       earlyPhaseDurationMs: Number(fields.early_phase_duration_ms || 0),
       phaseDurationMs: Number(fields.phase_duration_ms || 0),
       transfersLocked: Boolean(fields.transfers_locked),
@@ -428,35 +435,58 @@ export async function getTokenById(tokenId: string): Promise<MemeTokenData | nul
   }
 }
 
-// Get user's token balance for a specific token by querying purchase events
+// Get user's token balance for a specific token by querying purchase and sell events
 export async function getUserTokenBalance(tokenId: string, userAddress: string): Promise<number> {
   const client = getSuiClient();
   
   try {
-    // Query all PurchaseMade events for this token
-    const events = await client.queryEvents({
+    // Query all PurchaseMade events
+    const purchaseEvents = await client.queryEvents({
       query: {
         MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::PurchaseMade`
       },
       order: 'descending',
     });
 
+    // Query all TokensSold events
+    const sellEvents = await client.queryEvents({
+      query: {
+        MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::TokensSold`
+      },
+      order: 'descending',
+    });
+
     console.log('📊 Querying balance for token:', tokenId, 'user:', userAddress);
-    console.log('📊 Found', events.data.length, 'purchase events');
+    console.log('📊 Found', purchaseEvents.data.length, 'purchase events');
+    console.log('📊 Found', sellEvents.data.length, 'sell events');
 
     // Sum up all purchases for this user and token
     let totalBalance = 0;
     
-    for (const event of events.data) {
+    for (const event of purchaseEvents.data) {
       const parsedJson = event.parsedJson as any;
       const buyer = parsedJson.buyer;
       const eventTokenId = parsedJson.token_id;
-      const amount = Number(parsedJson.amount);
+      const amount = Number(parsedJson.token_amount || 0);
 
       // Check if this event is for the user and token we're looking for
       if (buyer === userAddress && eventTokenId === tokenId) {
         totalBalance += amount;
         console.log('✅ Found purchase:', amount, 'tokens');
+      }
+    }
+
+    // Subtract all sells for this user and token
+    for (const event of sellEvents.data) {
+      const parsedJson = event.parsedJson as any;
+      const seller = parsedJson.seller;
+      const eventTokenId = parsedJson.token_id;
+      const amount = Number(parsedJson.token_amount || 0);
+
+      // Check if this event is for the user and token we're looking for
+      if (seller === userAddress && eventTokenId === tokenId) {
+        totalBalance -= amount;
+        console.log('✅ Found sell:', amount, 'tokens');
       }
     }
 
@@ -740,5 +770,95 @@ export async function getSessionById(sessionId: string): Promise<TradingSessionD
   } catch (error) {
     console.error('Failed to fetch session:', error);
     return null;
+  }
+}
+
+// Type for token holder data
+export interface TokenHolder {
+  address: string;
+  balance: number; // in tokens
+  percentage: number; // percentage of circulating supply
+}
+
+// Get top token holders by querying PurchaseMade and TokensSold events
+export async function getTopTokenHolders(tokenId: string, limit: number = 20): Promise<TokenHolder[]> {
+  const client = getSuiClient();
+  
+  try {
+    // Query all PurchaseMade events
+    const purchaseEvents = await client.queryEvents({
+      query: {
+        MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::PurchaseMade`
+      },
+      order: 'descending',
+    });
+
+    // Query all TokensSold events
+    const sellEvents = await client.queryEvents({
+      query: {
+        MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::TokensSold`
+      },
+      order: 'descending',
+    });
+
+    console.log('📊 Found', purchaseEvents.data.length, 'purchase events');
+    console.log('📊 Found', sellEvents.data.length, 'sell events');
+
+    // Aggregate balances for each holder
+    const balances: { [address: string]: number } = {};
+    
+    // Add purchases
+    for (const event of purchaseEvents.data) {
+      const parsedJson = event.parsedJson as any;
+      const eventTokenId = parsedJson.token_id;
+      
+      // Only count events for this token
+      if (eventTokenId === tokenId) {
+        const buyer = parsedJson.buyer;
+        const tokenAmount = Number(parsedJson.token_amount || 0);
+        
+        if (!balances[buyer]) {
+          balances[buyer] = 0;
+        }
+        balances[buyer] += tokenAmount;
+      }
+    }
+
+    // Subtract sells
+    for (const event of sellEvents.data) {
+      const parsedJson = event.parsedJson as any;
+      const eventTokenId = parsedJson.token_id;
+      
+      // Only count events for this token
+      if (eventTokenId === tokenId) {
+        const seller = parsedJson.seller;
+        const tokenAmount = Number(parsedJson.token_amount || 0);
+        
+        if (!balances[seller]) {
+          balances[seller] = 0;
+        }
+        balances[seller] -= tokenAmount;
+      }
+    }
+
+    // Convert to array and calculate percentages
+    const totalSupply = Object.values(balances).reduce((sum, balance) => sum + balance, 0);
+    
+    const holders: TokenHolder[] = Object.entries(balances)
+      .filter(([_, balance]) => balance > 0) // Only include holders with positive balance
+      .map(([address, balance]) => ({
+        address,
+        balance: balance / 1_000_000_000, // Convert from base units to tokens
+        percentage: (balance / totalSupply) * 100,
+      }))
+      .sort((a, b) => b.balance - a.balance) // Sort by balance descending
+      .slice(0, limit); // Take top N
+
+    console.log('📊 Top holders:', holders);
+    
+    return holders;
+  } catch (error) {
+    console.error('Failed to fetch top holders:', error);
+    return [];
   }
 }

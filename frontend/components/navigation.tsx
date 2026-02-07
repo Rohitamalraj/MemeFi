@@ -65,10 +65,8 @@ export function Navigation() {
   const navLinks = [
     { label: "Home", href: "/", isHash: false },
     { label: "Tokens", href: "/tokens", isHash: false },
-    { label: "Sessions", href: "/sessions", isHash: false },
     { label: "Launch", href: "/launch", isHash: false },
     { label: "Portfolio", href: "/portfolio", isHash: false },
-    { label: "Dashboard", href: "/dashboard", isHash: false },
   ]
 
   return (

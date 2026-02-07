@@ -1,0 +1,585 @@
+# How to Use Real-Time Price Data
+URL: /price-feeds/core/use-real-time-data
+
+***
+
+title: How to Use Real-Time Price Data
+description: Guides for using Pyth real-time price feeds
+slug: /price-feeds/core/use-real-time-data
+------------------------------------------
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+<YouTubeEmbed id="25lIVs8b2Ho" title="Different Approaches to Integrate Pyth Prices" />
+
+The following guides demonstrate how to consume Pyth real-time prices on various blockchains.
+These guides are intended for developers building on-chain applications that need the latest price data, i.e., the price data must
+be on the blockchain.
+
+Pyth price feeds are available on 100+ blockchain ecosystems.
+Check out the complete list of chains and implementation contract addresses at [Contract Addresses](../contract-addresses).
+If your blockchain is not supported, please [ask in the dev-forum](https://dev-forum.pyth.network/latest).
+
+## Choosing Your Integration Method
+
+**Pull integration** is the default choice for most applications. In this integration, the application retrieves price data from a [webservice](../how-pyth-works/hermes) and submits it to
+an on-chain smart contact as part of the transaction. This integration provides the lowest-latency access to Pyth price data.
+
+**Push integration** is for applications that don't want to pull prices in every transaction and prefer a purely on-chain integration.
+
+<Callout type="info">
+  All feeds are available through both integration methods. However, to use pull
+  integration, the application needs to submit the prices to the on-chain smart
+  contract as part of the transaction. Check out the Pull Integration section
+  below to get started.
+</Callout>
+
+## Pull Integration
+
+Consult the relevant ecosystem guide to get started using **pull integration**:
+
+* [EVM](../use-real-time-data/pull-integration/evm)
+* [Solana](../use-real-time-data/pull-integration/solana)
+* [Starknet](../use-real-time-data/pull-integration/starknet)
+* [Aptos](../use-real-time-data/pull-integration/aptos)
+* [CosmWasm](../use-real-time-data/pull-integration/cosmwasm)
+* [Sui](./pull-integration/sui)
+* [IOTA](./pull-integration/iota)
+* [Near](./pull-integration/near)
+
+## Push Integration
+
+To consume real-time price data using **push** integration, check out the following guides:
+
+* [Using Push Integration](../use-real-time-data/push-integration)
+
+This guide will walk you through the steps to use real-time price data using push integration in every ecosystem.
+
+## Off-Chain Applications
+
+Pyth price feeds can also be used in off-chain applications.
+For example, an application may need to show real-time asset prices on a website.
+Developers building such applications can consult the following guide:
+
+* [Off-chain Apps](../fetch-price-updates)
+
+To fetch historical prices, application developers can check out the [Use Historical Price Data](../use-historical-price-data) guide.
+# Fetch Price Updates
+URL: /price-feeds/core/fetch-price-updates
+
+***
+
+title: Fetch Price Updates
+description: Learn how to retrieve Pyth price updates via REST, streaming, and SDK
+slug: /price-feeds/core/fetch-price-updates
+-------------------------------------------
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+<YouTubeEmbed id="sIF9lswg_HY" title="The Most Effective Way to Get Prices Onchain" />
+
+The following guide explains how to fetch price updates.
+Price updates can be submitted to the Pyth Price Feeds contract to update the on-chain price.
+Please see [What is a Pull Oracle?](/price-feeds/core/pull-updates) to learn more.
+
+Price updates are served from [Hermes](/price-feeds/core/how-pyth-works/hermes), which
+provides three different ways to fetch price updates:
+
+1. [REST API](#rest-api)
+2. [Streaming](#streaming)
+3. [SDK](#sdk)
+
+<Callout type="info" title="Price Feed IDs">
+  Fetching a price from Hermes requires a price feed ID. This ID serves as a
+  unique identifier for each price feed (e.g., BTC/USD). The complete list of
+  Pyth price feed IDs is available at
+  [https://docs.pyth.network/price-feeds/price-feeds](https://docs.pyth.network/price-feeds/price-feeds)
+</Callout>
+
+## REST API
+
+Hermes exposes several endpoints to fetch the price updates.
+Use the `/v2/updates/price/latest` endpoint to fetch the latest price update for one or more feeds.
+This endpoint allows you to fetch the latest price updates for multiple feeds in a single request.
+For example, the following command retrieves the latest price updates for BTC/USD and ETH/USD:
+
+```bash copy
+curl -X 'GET' \
+  'https://hermes.pyth.network/v2/updates/price/latest?ids%5B%5D=0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43&ids%5B%5D=0xc96458d393fe9deb7a7d63a0ac41e2898a67a7750dbd166673279e06c868df0a'
+```
+
+The output will be similar to the following containing the requested price update:
+
+```bash
+{
+  "binary": {
+    "encoding": "hex",
+    "data": [
+      "504e41550100000003b801000000040d00561f4ceb8ce5eb58adda318009817714a017b0db9a7f1ef57253c81d1984d8140cdee5c06925a1cbd7a2612211fddcd91008dd854444b513519a06fdc1a7b00101021612a8c846810b86a42eb3c9fc25ad9b1c5bbccf6bcd2df39fa83bfd580a58646d508fa28c4cecd8878eefaf964eca8de36031cad28b3c8a870a409a8b0a062d0003e8c8dd8bc33307235e3073e7a66af5087824628e8e6b4fa02df9e8fd1bf4757f28388255e1866b52edb0d8f604e97c6afcb05a33dce52b48dbdeeea85028e9ac0004460bf2bce4fd0f84961c20728aa48d35c35ca7347ad6229800312013e3645371016c837a779fe8c31e6e9b6d5cdeb41e6e215627d6a51e2bf8faaa7ddf25e0ec00065283785418ac10b5b7ee3eb5b753f7e319a6c9890180821c8c6b2b57912ec96d315c91ab544c330839ee1c23f3fefdd063cd36fa77dc06a84a566bf30d9f4c2d01075a1471c93ce6275e0319438f013058aeaf3c4029bab24f3bf8b89786992ff03513440d8a61c4a31b76ea14fd96ec010a52ce2aa6212783163532b6bee047d90b000a4ab3faa7466ed5a62402024f62e0f6ea10b5e44341bf1869dc0317091cbc38444c27c4e88f6d9a8f0c85355c341b108537f01e79363e5c27331e031cccec82bb000b56537c736f12f44027c86e16da23af8515535b7839ff9095a93db178450f954f10f7c7ea7b8132f1b75909aa996ea6fb661cc3bbf12624f88c646fe2f964279d000d1edd3f3b34464a2a103ae7b6a2705f385207d4a91d721a175157f9238d0a54dd1127286db3a13ff1df67f02f195b665c09e4301f9df8fcfd251fefba30d12190010e8814c0416af5a6c702fbdee573ea5819a8ec452db5d182fafc37b47c25937e1d6359b17ddedd696056732ae37a80463ce515b85744a5342999599a9bdcc75ea2010f5821c0d3a9887f0f5f1c59e5a7e62d98fa7f4cd737c44ce4d26f3b466ffe5b310fed58f2282d0449de119d8ad12788624e87aee0d5f49d8881eaa14b5f2d653f00117d01a5a41e69dc58ce406c51ba2254128faa522b69d7f8c8a2eeb862858469eb119c119439513a1e068ad8df5214b251c6b4ef74600366935bdb1b72244dc97200128e34e3a83b7382a8f498235a52efea79d0c9a4e1de30340d70b5e9d8013927be137185a5423ae05a743fd4c5d2374de5aba72d86f70b7bfb2eb88ef8df052e79016634f2f500000000001ae101faedac5851e32b9b23b5f9411a8c2bac4aae3ed4dd7b811dd1a72ea4aa7100000000033d2ada01415557560000000000084728a20000271034997d7ffc8a4495fd78fed48c2bf8d5e188d74e02005500e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b4300000595cfbc774800000000c3f8e497fffffff8000000006634f2f5000000006634f2f50000058adefc436000000000e212dff80ab660ac1113aacd22a0d1e837a9cbbb4316ccdd64272484102a99c1337c282e56981a68916d29df1d1716b33f63a3b78b8d7b88ab46652879685487e2520aed797adec6550872f99049088ffbde70766eadb20520615efadb40d92afc542d42a113e1ef3c2d2bb920002cfb5b0bb3452b59e5e59585e25964682084851e189cf74861cd010893df90a7718062c4b6e89f5bfa8269d152c6f58be368cc588af6575595bc376b65a0e7f916fc5eef915402a661ccf024bf94f181b8193367251f0d7411aa23094626f7005500c96458d393fe9deb7a7d63a0ac41e2898a67a7750dbd166673279e06c868df0a00000000004bad0f0000000000001559fffffff8000000006634f2f5000000006634f2f500000000004c074200000000000015a00a3f32b0cd92140161520c68b4df848dce5b315f5a67f61563ec3b2fb6b17ab64fe530f438c7f035cb7c204ba80e3c6b8e14fc54f10b8e79af497f7dbf3c225f183f509b2db99ab2fdee7f1a36b699cc6fc1a868ad8b7fbf9a28461133fb45cb7940271678ca5835657a5089335850924b016ef17cc280e4f7582c879140889bbe4a4d39d5160d5b71f7983a53c4b6e89f5bfa8269d152c6f58be368cc588af6575595bc376b65a0e7f916fc5eef915402a661ccf024bf94f181b8193367251f0d7411aa23094626f7"
+    ]
+  },
+  "parsed": [
+    {
+      "id": "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+      "price": {
+        "price": "6140993501000",
+        "conf": "3287868567",
+        "expo": -8,
+        "publish_time": 1714746101
+      },
+      "ema_price": {
+        "price": "6094004700000",
+        "conf": "3792887800",
+        "expo": -8,
+        "publish_time": 1714746101
+      },
+      "metadata": {
+        "slot": 138881186,
+        "proof_available_time": 1714746103,
+        "prev_publish_time": 1714746101
+      }
+    },
+    {
+      "id": "c96458d393fe9deb7a7d63a0ac41e2898a67a7750dbd166673279e06c868df0a",
+      "price": {
+        "price": "4959503",
+        "conf": "5465",
+        "expo": -8,
+        "publish_time": 1714746101
+      },
+      "ema_price": {
+        "price": "4982594",
+        "conf": "5536",
+        "expo": -8,
+        "publish_time": 1714746101
+      },
+      "metadata": {
+        "slot": 138881186,
+        "proof_available_time": 1714746103,
+        "prev_publish_time": 1714746101
+      }
+    }
+  ]
+}
+```
+
+Hermes offers several other endpoints for retrieving price updates. For more information, see the [Hermes API Reference](https://hermes.pyth.network/docs/#/).
+
+## Streaming
+
+Hermes also provides a Server-Sent Events (SSE) endpoint to stream price updates.
+The `/v2/updates/price/stream` endpoint continuously streams price updates for the requested feeds to the caller.
+
+The connection will automatically close after 24 hours to prevent resource leaks. Clients should implement reconnection logic to maintain continuous price updates.
+
+For example, to stream price updates for BTC/USD, run:
+
+```bash copy
+curl -N 'https://hermes.pyth.network/v2/updates/price/stream?ids[]=0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43'
+```
+
+The output is a stream of events containing the requested price updates, similar to the following:
+
+```bash
+data:{"binary":{"encoding":"hex","data":["504e41550100000003b801000000040d00eabd2d495ed4f262eb6fafb24d8086ee608eb19da4e447c64a38e6b3eefcf2d27bfb21bdbf1bf803115a1fcda040931e851c48b52215cbcc291663ba53b6b24b01018f071b30658331897090011cbbe96ff202d5d066714006b3670440122089d1ad1e6ce7236b89d3ccacfeee49512065db54233aca946a8e8e28e83968e3bc517e0002f678f31f75bb9d0a1957119205859fd348f07b069b97e575b73bbc82d402b16f24b62b5366f3f05aab7d528532dfc1911646ed705b795f4492fe84d542b507f60103b03dc0569c018119aa3c7c98cb156c7423ed8913d95e08b44674e82523b8f1ab437cc4b3d284e1f4f80cda67ef123b892f15021951e0fbcd80216a2beda9ac5c0104337f1053c8a1c7550609436b9426530df1e22f0afaf26c9210887d8bbe563a8418cbb2bcea8a095fb9ad3b06f5e575ae168eb5f9ab93a0d2a6be2ffd631cc2ad0006c42a1ada427f7f8756d14d5a6764ac738474f17ed2a1866cf10d94544a92a9040c9ad6caef6aa1c4ef9d67f808c0d75f52a18e60fd3589d76bc21d5ed3512e8d01076ba49d01aefbfb54bbe8d37a003cfd91625dcbab52691121d99d490567a409e73fb5489180dc582c3110c6dc81b95cd1c380e7c76d53c1238aa035ea17251d950008b6f57f8221306f54f6405f34cf4dce795e8b9c7dd309c6069212e0dfa7a427234adcd296892087e7e109d85d27aaea267c83f98a9bf49b92a27f16b5974ed101000b0756503ae6178fcd2ce6286dc2210415ee229cdc7cb57892b3d13a45661e2c33077ec4afa45d03e8755bbcb129f64d21f302f6e759321fe05a1edd8eb782a04d010df60048fe6b5d3217c8a8fe03351a9bab77f0938c2d5913d24bf9a52da54bd0ce3227dbbb83cf67f9b10ab6adeea005f54011202beafed7814e5172c9ca0a06ad000f4e231dd10e55ae5149f982833093937237bf261e05fd903b953f3771b02ef49640ef0cd9c11ba80a7afb55fece73f548c4808b713b99438502df818c5150ecb00011fe3be80af9b0cdbee241689da36793a7d101fb4b9357f6a97f97a581b253d9dd4ee56dffe5d8c5b217e4b1070607a7f5114d9a63769f49ad7045cfc86f40a9890012bbfdd274135f9fecd68d7f88d05756e6666a3a28665852f8af380c48d6bc91a850770fa193fe3d80b0cec9a5451200bcac20a16a397267e9a0bb2f680f5d1dfa016634fb8d00000000001ae101faedac5851e32b9b23b5f9411a8c2bac4aae3ed4dd7b811dd1a72ea4aa7100000000033d3e2b0141555756000000000008473bf600002710d2760ed144ee74be4d41297509cdbff411fffa5801005500e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b430000059afeec470000000000c2d215effffffff8000000006634fb8c000000006634fb8c00000593465c858000000000d5cfbf900a6526b4409251e9d274f511a52a6cbabb1b9a6c348d4bc394abfdba2e30ac9f4b127502861670451c1ae10f8231549fdd446eea366199686b78cebe4a918671b73aa1e534b4c66c38d01100a593681cf47897a3cb14045dff7c2795033a295d9a01d08cef7033f64f7700464f4cfaec825fa3117f04b4be713cadf32dcbe8ce1c763d311ee040e1a1de13c56e4bfaba769449d8c7ebf8685a756b1ebe6efd41df5f59a2bd7042b74982afe362bf7df2951f2f47e758f98107849cdb94fa063cb3b5bc0560e67d4929"]},"parsed":[{"id":"e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43","price":{"price":"6163260000000","conf":"3268548079","expo":-8,"publish_time":1714748300},"ema_price":{"price":"6130098800000","conf":"3587162000","expo":-8,"publish_time":1714748300},"metadata":{"slot":138886134,"proof_available_time":1714748302,"prev_publish_time":1714748300}}]}
+
+data:{"binary":{"encoding":"hex","data":["504e41550100000003b801000000040d00c225b810b04721ccc39a0206054caf741eb99e349b22ab29706f2678d17fe4895d4e4aeca6933f82102b6e3aeebd295c5bce268e86700c15922f007fa940e9070102501280da67908dc8a20f7c2ff4503247eb6665818cdb59e589432cc7ce02b8480da408192ab382fe99ebec381bac3a8b044b38272c95177bcc52294a92bee1450103ba792f1f72f9649b6de0b5e57c3c9b5241f5bfc6ef7eddef3dc43fef853712244ae0fef85a9a716713f057fc3419c734d87d0559687e3afc80c0ed98a639027e010685b897965b108523c8e7f5cd71ae6ea949709c5c53317e2f10c7675b50b33bc5219423aa360fd45503bf38095b995ea4dcd322d60fe6a419523e586c18913be400076b7d062164bb2683488cb58c937e98a654335dbca2bf0022c227f163523bf0b108cc21912193bb3ce8f0f629b64790d3078aa8e2f971da5f08fb6131b452a4b600092b98506c6918be41718667ba9eb77442af665be25daafba429c1b8c9efe956221e42f5a0dbfa663a2bd1ed2ec8b2de05ac208a87c7ab7c7b09d5c08850b79bb0010aedf6b21ec277ba911cf991ccd61a552ed05ea43757fce4d8d80cd1ba644464b94f1915c68dfc2824266e19ab33efb556ce5efda2a8f191c86410aae7b169639f010bf8762ef1e3923662b5c70ce60eb9973253a10935d2e1be5064c5f4bd0c071aac3d803a97f5a7640b6a3eace962ad19b9590ffb41a2461a44ae2248ab5a5d1030010c711b2cbce91aa23bc0059c0f1bbfb4330eed0ffdd91edc6a7be43c8e2a7d79e755a7722bc789729301d85ea6602c70a5f84a978b90551b248869ddf5c542d498010d9b91a1658a6e9d18af4a40438ee9c9d5d3906d1f73c1a0793231a17bfc7b5f823fba94bc05f237d661ee344f434afa8c4c42bbcecd94c7653fa795ffcb1c1cf8010efbcc92e2e80ff957061146f713f5ad4b55c789c93cdf3f963ef2bb1a7c08b32f67a809f50892aeb7147150afdee20d6015f740bc9efdb42782e443720d3d32b8010facda4336d8313e28b1d65617d1c2a04a5a8b03f0513304ac67ccf550c0729e4054dfb5b89a0a8cc880fa4772416a843b5f73947c2576477ba564f41258bc1035001226486d88c8234e7d61945cafd925f6edb78b18b88313b0774021d6569884a49517c0d527f71c17bdfaf04e80fc3da394d8ce85119c76c5ac70953820510ad2c0016634fb8d00000000001ae101faedac5851e32b9b23b5f9411a8c2bac4aae3ed4dd7b811dd1a72ea4aa7100000000033d3e2c0141555756000000000008473bf70000271070d00559e2514c7d37112103ee50821d9f3fea1301005500e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b430000059af4abc40000000000c52e0e33fffffff8000000006634fb8d000000006634fb8c00000593469c9bc000000000d5cf34800a0c6b422d2499aadf7404f3883f57950914cb5244a7eac10d23c63c6cb83687c792233d96d4f990a9ea788e9d37c1d58f50a2c17c4346cea646effc273e57f2e79f3674fb4c9ca7b0d229076b29f8632847de2b7e97ef5b554e42c9b1c3c9d62d7ea8859f6270b45d85256e206b25637f7b0a625186d5d58d86c7f1249b33f093de368e293daf679ad3fad5f19dea39b804c189b231b5cded362b5023c6a36b273191575d8e10f0c7aa2dc0479898b110e26a5238a2d90781e7db2318aa0751e00222d2be5ca0b707"]},"parsed":[{"id":"e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43","price":{"price":"6163088000000","conf":"3308129843","expo":-8,"publish_time":1714748301},"ema_price":{"price":"6130103000000","conf":"3587126400","expo":-8,"publish_time":1714748301},"metadata":{"slot":138886135,"proof_available_time":1714748302,"prev_publish_time":1714748300}}]}
+```
+
+## SDK
+
+Pyth provides a typescript SDK for Hermes to fetch price updates.
+The [`HermesClient`](https://github.com/pyth-network/pyth-crosschain/blob/main/apps/hermes/client/js/src/HermesClient.ts#L41) class in this [SDK](https://github.com/pyth-network/pyth-crosschain/tree/main/apps/hermes/client/js) connects to Hermes to fetch and stream price updates.
+
+```typescript copy
+const connection = new HermesClient("https://hermes.pyth.network", {});
+
+const priceIds = [
+  // You can find the ids of prices at https://docs.pyth.network/price-feeds/price-feeds
+  "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43", // BTC/USD price id
+  "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", // ETH/USD price id
+];
+
+// Get price feeds
+// You can also fetch price feeds for other assets by specifying the asset name and asset class.
+const priceFeeds = await connection.getPriceFeeds("btc", "crypto");
+console.log(priceFeeds);
+
+// Latest price updates
+const priceUpdates = await connection.getLatestPriceUpdates(priceIds);
+console.log(priceUpdates);
+```
+
+`HermesClient` also allows subscribing to real-time price updates over a Server-Sent Events (SSE) connection:
+
+```typescript copy
+// Streaming price updates
+const eventSource = await connection.getStreamingPriceUpdates(priceIds);
+
+eventSource.onmessage = (event) => {
+  console.log("Received price update:", event.data);
+};
+
+eventSource.onerror = (error) => {
+  console.error("Error receiving updates:", error);
+  eventSource.close();
+};
+
+await sleep(5000);
+
+// To stop listening to the updates, you can call eventSource.close();
+console.log("Closing event source.");
+eventSource.close();
+```
+# How to Use Real-Time Data in Sui Contracts
+URL: /price-feeds/core/use-real-time-data/pull-integration/sui
+
+***
+
+title: How to Use Real-Time Data in Sui Contracts
+description: Consume Pyth Network prices in Sui applications
+slug: /price-feeds/core/use-real-time-data/pull-integration/sui
+---------------------------------------------------------------
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+This guide explains how to use real-time Pyth data in Sui applications.
+
+## Install Pyth SDK
+
+Use the following dependency in your `Move.toml` file to use the latest Pyth Sui package and its dependencies:
+
+<Tabs items={["Sui Mainnet", "Sui Testnet"]}>
+  <Tab value="Sui Mainnet">
+    ```bash copy
+    [dependencies.Pyth]
+    git = "https://github.com/pyth-network/pyth-crosschain.git"
+    subdir = "target_chains/sui/contracts"
+    rev = "sui-contract-mainnet"
+
+    [dependencies.Wormhole]
+    git = "https://github.com/wormhole-foundation/wormhole.git"
+    subdir = "sui/wormhole"
+    rev = "sui/mainnet"
+
+    # Pyth is locked into this specific `rev` because the package depends on Wormhole and is pinned to this version.
+
+    [dependencies.Sui]
+    git = "https://github.com/MystenLabs/sui.git"
+    subdir = "crates/sui-framework/packages/sui-framework"
+    rev = "041c5f2bae2fe52079e44b70514333532d69f4e6"
+
+    ```
+  </Tab>
+
+  <Tab value="Sui Testnet">
+    ```bash copy
+    [dependencies.Pyth]
+    git = "https://github.com/pyth-network/pyth-crosschain.git"
+    subdir = "target_chains/sui/contracts"
+    rev = "sui-contract-testnet"
+
+    [dependencies.Wormhole]
+    git = "https://github.com/wormhole-foundation/wormhole.git"
+    subdir = "sui/wormhole"
+    rev = "sui/testnet"
+
+    # Pyth is locked into this specific `rev` because the package depends on Wormhole and is pinned to this version.
+
+    [dependencies.Sui]
+    git = "https://github.com/MystenLabs/sui.git"
+    subdir = "crates/sui-framework/packages/sui-framework"
+    rev = "041c5f2bae2fe52079e44b70514333532d69f4e6"
+    ```
+  </Tab>
+</Tabs>
+
+Pyth also provides a javascript SDK to construct transaction blocks that update price feeds:
+
+<Tabs items={["Sui"]}>
+  <Tab value="Sui">
+    ```bash
+    # NPM
+    npm install --save @pythnetwork/pyth-sui-js
+
+    # Yarn
+
+    yarn add @pythnetwork/pyth-sui-js
+
+    ```
+  </Tab>
+</Tabs>
+
+## Write Contract Code
+
+The code snippet below provides a general template for what your contract code should look like:
+
+```rust {18} copy
+/// Module: oracle
+module oracle::oracle;
+
+use sui::clock::Clock;
+use pyth::price_info;
+use pyth::price_identifier;
+use pyth::price;
+use pyth::i64::I64;
+use pyth::pyth;
+use pyth::price_info::PriceInfoObject;
+
+const E_INVALID_ID: u64 = 1;
+
+public fun get_sui_price(
+    // Other arguments
+    clock: &Clock,
+    price_info_object: &PriceInfoObject,
+): I64 {
+    let max_age = 60;
+
+    // Make sure the price is not older than max_age seconds
+    let price_struct = pyth::get_price_no_older_than(price_info_object, clock, max_age);
+
+    // Check the price feed ID
+    let price_info = price_info::get_price_info_from_price_info_object(price_info_object);
+    let price_id = price_identifier::get_bytes(&price_info::get_price_identifier(&price_info));
+
+    // SUI/USD price feed ID
+    // The complete list of feed IDs is available at https://docs.pyth.network/price-feeds/price-feeds
+    // Note: Sui uses the Pyth price feed ID without the `0x` prefix.
+    let testnet_sui_price_id = x"50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266";
+    assert!(price_id == testnet_sui_price_id, E_INVALID_ID);
+
+    // Extract the price, decimal, and timestamp from the price struct and use them.
+    let _decimal_i64 = price::get_expo(&price_struct);
+    let price_i64 = price::get_price(&price_struct);
+    let _timestamp_sec = price::get_timestamp(&price_struct);
+
+    price_i64
+}
+```
+
+One can consume the price by calling `pyth::get_price` abovementioned or other utility functions on the `PriceInfoObject` in the Move module
+
+The code snippet below provides an example of how to update the Pyth price feeds:
+
+```ts copy
+import {
+  SuiPythClient,
+  SuiPriceServiceConnection,
+} from "@pythnetwork/pyth-sui-js";
+import { SuiClient } from "@mysten/sui/client";
+import { Transaction } from "@mysten/sui/transactions";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+
+/// Step 1: Get the off-chain data.
+const connection = new SuiPriceServiceConnection(
+  "https://hermes-beta.pyth.network", // [!] Only for Sui Testnet
+  // "https://hermes.pyth.network/", // Use this for Mainnet
+  {
+    // Provide this option to retrieve signed price updates for on-chain contracts!
+    priceFeedRequestConfig: {
+      binary: true,
+    },
+  },
+);
+const priceIDs = [
+  // You can find the IDs of prices at https://docs.pyth.network/price-feeds/price-feeds
+  "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266", // SUI/USD price ID
+];
+const priceUpdateData = await connection.getPriceFeedsUpdateData(priceIDs);
+
+/// Step 2: Submit the new price on-chain and verify it using the contract.
+const suiClient = new SuiClient({ url: "https://fullnode.testnet.sui.io:443" });
+
+// Fixed the StateIds using the CLI example extracting them from
+// here: https://docs.pyth.network/price-feeds/contract-addresses/sui
+const pythTestnetStateId =
+  "0x243759059f4c3111179da5878c12f68d612c21a8d54d85edc86164bb18be1c7c"; // Testnet
+const wormholeTestnetStateId =
+  "0x31358d198147da50db32eda2562951d53973a0c0ad5ed738e9b17d88b213d790"; // Testnet
+
+const pythClient = new SuiPythClient(
+  suiClient,
+  pythTestnetStateId,
+  wormholeTestnetStateId,
+);
+
+const transaction = new Transaction();
+
+/// By calling the updatePriceFeeds function, the SuiPythClient adds the necessary
+/// transactions to the transaction block to update the price feeds.
+const priceInfoObjectIds = await pythClient.updatePriceFeeds(
+  transaction,
+  priceUpdateData,
+  priceIDs,
+);
+
+const suiPriceObjectId = priceInfoObjectIds[0];
+if (!suiPriceObjectId) {
+  throw new Error("suiPriceObjectId is undefined");
+}
+
+/// This is the package id that we receive after publishing `oracle` contract from the previous step.
+const testnetExampleContractPackageId =
+  "0x42d05111a160febe4144338647e0b7a80daea459c765c1e29a7a6198b235f67c";
+const CLOCK =
+  "0x0000000000000000000000000000000000000000000000000000000000000006";
+transaction.moveCall({
+  target: `${testnetExampleContractPackageId}::oracle::get_sui_price`,
+  arguments: [transaction.object(CLOCK), transaction.object(suiPriceObjectId)],
+});
+transaction.setGasBudget(1000000000);
+
+const keypair = Ed25519Keypair.fromSecretKey(
+  process.env.ADMIN_SECRET_KEY!.toLowerCase(),
+);
+const result = await suiClient.signAndExecuteTransaction({
+  transaction,
+  signer: keypair,
+  options: {
+    showEffects: true,
+    showEvents: true,
+  },
+});
+```
+
+By calling the `updatePriceFeeds` function, the `SuiPythClient` adds the necessary transactions to the transaction block to update the price feeds.
+
+<Callout type="warning">
+  Your Sui Move module **should NOT** have a hard-coded call to `pyth::update_single_price_feed.` In other words, a contract should **never call** the Sui Pyth `pyth::update_single_price_feed` entry point. Instead, it should be called directly from client code (e.g., Typescript or Rust).
+
+  When Sui contracts are [upgraded](https://docs.sui.io/build/package-upgrades), the address changes, which makes the old address no longer valid. If your module has a hard-coded call to `pyth::update_single_price_feed` living at a fixed call-site, it may eventually get bricked due to how Pyth upgrades are implemented. (Pyth only allow users to interact with the most recent package version for security reasons).
+
+  Therefore, you should build a [Sui programmable transaction](https://docs.sui.io/build/prog-trans-ts-sdk) that first updates the price by calling `pyth::update_single_price_feed` at the latest call-site from the client-side and then call a function in your contract that invokes `pyth::get_price` on the `PriceInfoObject` to get the recently updated price.
+  You can use `SuiPythClient` to build such transactions and handle all the complexity of updating the price feeds.
+
+  Consult [Fetch Price Updates](/price-feeds/core/fetch-price-updates) for more information on how to fetch the `pyth_price_update`.
+</Callout>
+
+## Additional Resources
+
+You may find these additional resources helpful for developing your Sui application.
+
+### CLI Example
+
+[This example](https://github.com/pyth-network/pyth-crosschain/tree/main/target_chains/sui/cli) shows how to update prices on a Sui network. It does the following:
+
+1. Fetches update data from Hermes for the given price feeds.
+2. Call the Pyth Sui contract with a price update.
+
+You can run this example with `npm run example-relay`. A full command that updates prices on the Sui testnet looks like this:
+
+```bash
+export SUI_KEY=YOUR_PRIV_KEY;
+npm run example-relay -- --feed-id "5a035d5440f5c163069af66062bac6c79377bf88396fa27e6067bfca8096d280" \
+--hermes "https://hermes-beta.pyth.network" \
+--full-node "https://fullnode.testnet.sui.io:443" \
+--pyth-state-id "0x243759059f4c3111179da5878c12f68d612c21a8d54d85edc86164bb18be1c7c" \
+--wormhole-state-id "0x31358d198147da50db32eda2562951d53973a0c0ad5ed738e9b17d88b213d790"
+```
+
+### Contract Addresses
+
+Consult [Sui Contract Addresses](../../contract-addresses/sui) to find the package IDs.
+
+### Pyth Price Feed IDs
+
+Consult [Pyth Price Feed IDs](/price-feeds/core/price-feeds) to find Pyth price feed IDs for various assets.
+# on Sui
+URL: /price-feeds/core/contract-addresses/sui
+
+***
+
+title: on Sui
+description: List of Pyth price feed contract addresses on Sui networks
+slug: /price-feeds/core/contract-addresses/sui
+----------------------------------------------
+
+Pyth is currently available on the following sui-based chains:
+
+### Stable channel
+
+#### Sui Mainnet
+
+| Name                | Address                                                                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pyth State ID       | [`0x1f9310238ee9298fb703c3419030b35b22bb1cc37113e3bb5007c99aec79e5b8`](https://explorer.sui.io/object/0x1f9310238ee9298fb703c3419030b35b22bb1cc37113e3bb5007c99aec79e5b8) |
+| Pyth Package ID     | [`0x04e20ddf36af412a4096f9014f4a565af9e812db9a05cc40254846cf6ed0ad91`](https://explorer.sui.io/object/0x04e20ddf36af412a4096f9014f4a565af9e812db9a05cc40254846cf6ed0ad91) |
+| Wormhole State ID   | [`0xaeab97f96cf9877fee2883315d459552b2b921edc16d7ceac6eab944dd88919c`](https://explorer.sui.io/object/0xaeab97f96cf9877fee2883315d459552b2b921edc16d7ceac6eab944dd88919c) |
+| Wormhole Package ID | [`0x5306f64e312b581766351c07af79c72fcb1cd25147157fdc2f8ad76de9a3fb6a`](https://explorer.sui.io/object/0x5306f64e312b581766351c07af79c72fcb1cd25147157fdc2f8ad76de9a3fb6a) |
+
+### Beta channel
+
+#### Sui Testnet
+
+| Name                | Address                                                                                                                                                                                   |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pyth State ID       | [`0x243759059f4c3111179da5878c12f68d612c21a8d54d85edc86164bb18be1c7c`](https://explorer.sui.io/object/0x2d82612a354f0b7e52809fc2845642911c7190404620cec8688f68808f8800d8?network=testnet) |
+| Pyth Package ID     | [`0xabf837e98c26087cba0883c0a7a28326b1fa3c5e1e2c5abdb486f9e8f594c837`](https://explorer.sui.io/object/0xf7114cc10266d90c0c9e4b84455bddf29b40bd78fe56832c7ac98682c3daa95b?network=testnet) |
+| Wormhole State ID   | [`0x31358d198147da50db32eda2562951d53973a0c0ad5ed738e9b17d88b213d790`](https://explorer.sui.io/object/0xebba4cc4d614f7a7cdbe883acc76d1cc767922bc96778e7b68be0d15fce27c02?network=testnet) |
+| Wormhole Package ID | [`0xf47329f4344f3bf0f8e436e2f7b485466cff300f12a166563995d3888c296a94`](https://explorer.sui.io/object/0xf47329f4344f3bf0f8e436e2f7b485466cff300f12a166563995d3888c296a94?network=testnet) |
+# Price Feeds
+URL: /price-feeds/core/price-feeds
+
+***
+
+title: Price Feeds
+description: Overview of Pyth price feeds, asset classes, and feed IDs
+slug: /price-feeds/core/price-feeds
+-----------------------------------
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+Pyth Price Feeds provide real-time, first-party, market data for a wide range of assets.
+
+Every price feed has a **unique ID**, representing the specific pair of assets being priced.
+These specific pairs are part of an asset class, which is a broader category of assets.
+
+Anyone can fetch available price feeds and their IDs via [Hermes API](https://hermes.pyth.network/docs/#/rest/price_feeds_metadata).
+
+## Asset Classes
+
+Every price feed belongs to an asset class. These asset classes distinguish between different types of assets, such as crypto, US equities, and metals.
+
+Refer to the [Asset Classes](./price-feeds/asset-classes) page to learn more about the existing asset classes.
+
+## Price Feed IDs
+
+Price Feed IDs are unique identifiers for each specific pair of assets being priced (e.g. BTC/USD).
+Every price update is tagged with the corresponding price feed ID.
+
+Applications need to store the IDs of the feeds they wish to read.
+However, the IDs may be represented in different formats (e.g. hex or base58) depending on the blockchain.
+Price feeds also have different IDs in the Stable and Beta channels.
+
+### Feed IDs
+
+Refer to the [Price Feed IDs](/price-feeds/core/price-feeds/price-feed-ids) page for the complete list of price feed IDs.
+
+### Solana Price Feed Accounts
+
+On Solana, each feed additionally has a collection of **price feed accounts** containing the feed's data.
+The addresses of these accounts are programmatically derived from the feed id and a shard id, which is simply a 16-bit number.
+See [How to Use Real-Time Data on Solana](../use-real-time-data/pull-integration/solana#price-feed-accounts) for more information on price feed accounts.
+# on Sui
+URL: /price-feeds/core/push-feeds/sui
+
+***
+
+title: on Sui
+description: List of Push Feeds on Sui
+slug: /price-feeds/core/push-feeds/sui
+--------------------------------------
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { SponsoredFeedsTable } from "../../../../../src/components/SponsoredFeedsTable";
+import suiMainnet from "./data/sui/sui-mainnet.json";
+
+<Callout type="info" title="Request Additional Feeds">
+  If you would like to see additional feeds on this list, please fill in this
+  [form](https://tally.so/r/nGz2jj) to signal your interest.
+</Callout>
+
+## Sui Mainnet
+
+<SponsoredFeedsTable feeds={suiMainnet.feeds} networkName="Sui mainnet" />

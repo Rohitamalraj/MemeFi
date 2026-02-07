@@ -8,6 +8,7 @@ export interface Trade {
   timestamp: number
   buyer: string
   phase: number
+  type: 'buy' | 'sell' // Track trade type
 }
 
 export interface CandleData {
@@ -88,13 +89,23 @@ function aggregateCandles(trades: Trade[], intervalSeconds: number): CandleData[
   return candles.sort((a, b) => a.time - b.time)
 }
 
-// Generate volume data with colors based on price change (pump.fun style)
-function generateVolumeData(candles: CandleData[]): VolumeData[] {
-  return candles.map(candle => ({
-    time: candle.time,
-    value: candle.volume,
-    color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
-  }))
+// Generate volume data with colors based on trade type
+function generateVolumeData(candles: CandleData[], trades: Trade[]): VolumeData[] {
+  return candles.map(candle => {
+    // Find trades in this candle's time period
+    const candleTrades = trades.filter(t => 
+      Math.floor(t.timestamp / 60) === Math.floor(candle.time / 60)
+    )
+    
+    // If there are any sells in this candle, show red; otherwise green
+    const hasSell = candleTrades.some(t => t.type === 'sell')
+    
+    return {
+      time: candle.time,
+      value: candle.volume,
+      color: hasSell ? 'rgba(239, 83, 80, 0.5)' : 'rgba(38, 166, 154, 0.5)'
+    }
+  })
 }
 
 export function useChartData(tokenId: string, intervalMinutes: number = 1, autoRefresh: boolean = true) {
@@ -132,65 +143,131 @@ export function useChartData(tokenId: string, intervalMinutes: number = 1, autoR
           console.log('📈 Token info:', { totalSupply, currentCirculatingSupply })
         }
 
-        // Query PurchaseMade events for this token
-        // Note: During PRIVATE phase, events are suppressed so they won't appear until phase ends
-        const events = await client.queryEvents({
-          query: {
-            MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::PurchaseMade`
-          },
-          order: 'ascending', // Get oldest first for proper price progression
-        })
+        // Query both PurchaseMade AND TokensSold events for this token
+        const [buyEvents, sellEvents] = await Promise.all([
+          client.queryEvents({
+            query: {
+              MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::PurchaseMade`
+            },
+            order: 'ascending',
+          }),
+          client.queryEvents({
+            query: {
+              MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::TokensSold`
+            },
+            order: 'ascending',
+          })
+        ])
 
-        console.log('📈 Events fetched:', events.data.length)
+        console.log('📈 Buy events:', buyEvents.data.length, 'Sell events:', sellEvents.data.length)
 
-        // Parse and filter events for this token
+        // Combine and parse all events
+        const allEvents: Array<{
+          type: 'buy' | 'sell'
+          tokenId: string
+          amount: number
+          timestamp: number
+          user: string
+        }> = []
+
+        // Parse buy events
+        for (const event of buyEvents.data) {
+          try {
+            const eventData = event.parsedJson as any
+            if (eventData.token_id !== tokenId) continue
+
+            allEvents.push({
+              type: 'buy',
+              tokenId: eventData.token_id,
+              amount: Number(eventData.token_amount || 0),
+              timestamp: Math.floor(Number(event.timestampMs || Date.now()) / 1000),
+              user: eventData.buyer || 'unknown'
+            })
+          } catch (err) {
+            console.warn('Failed to parse buy event:', err)
+          }
+        }
+
+        // Parse sell events
+        for (const event of sellEvents.data) {
+          try {
+            const eventData = event.parsedJson as any
+            if (eventData.token_id !== tokenId) continue
+
+            allEvents.push({
+              type: 'sell',
+              tokenId: eventData.token_id,
+              amount: Number(eventData.token_amount || 0),
+              timestamp: Math.floor(Number(event.timestampMs || Date.now()) / 1000),
+              user: eventData.seller || 'unknown'
+            })
+          } catch (err) {
+            console.warn('Failed to parse sell event:', err)
+          }
+        }
+
+        // Sort all events chronologically
+        allEvents.sort((a, b) => a.timestamp - b.timestamp)
+
+        console.log('📈 Total events:', allEvents.length)
+
+        // Process events and calculate prices based on bonding curve
         const tokenTrades: Trade[] = []
         let runningSupply = 0 // Track supply as we process events chronologically
 
-        for (const event of events.data) {
-          try {
-            const eventData = event.parsedJson as any
+        for (const event of allEvents) {
+          const basePrice = 0.0001
 
-            // Filter by token ID
-            if (eventData.token_id !== tokenId) continue
-
-            console.log('📈 Processing event:', eventData)
-
-            // Extract trade data
-            // The event has: amount, buyer, token_id, total_bought
-            // We need to track cumulative supply across all buyers
-            const amount = Number(eventData.amount || 0)
-            runningSupply += amount // Add this purchase to running total
-            
+          if (event.type === 'buy') {
+            // For buys: calculate price at current supply, then add to supply
             const supplyPercent = runningSupply / totalSupply
-
-            // Bonding curve formula: price = 0.0001 * (1 + 99 * supplyPercent)
-            const basePrice = 0.0001
             const price = basePrice * (1 + 99 * supplyPercent)
-
-            const amountInTokens = amount / 1_000_000_000 // Convert from base units
-            const timestamp = Math.floor(Number(event.timestampMs || Date.now()) / 1000) // Convert to seconds
-            const buyer = eventData.buyer || 'unknown'
-            const phase = 3 // Assume OPEN phase since events are visible
-
-            console.log('📈 Trade data:', { 
-              price, 
-              amount: amountInTokens, 
-              timestamp, 
-              buyer: buyer.slice(0, 8) + '...', 
-              runningSupply,
-              supplyPercent: (supplyPercent * 100).toFixed(4) + '%'
+            
+            runningSupply += event.amount // Increase supply after buy
+            
+            const amountInTokens = event.amount / 1_000_000_000
+            
+            console.log('📈 BUY:', { 
+              price: price.toFixed(6), 
+              amount: amountInTokens.toFixed(2), 
+              timestamp: event.timestamp,
+              user: event.user.slice(0, 8) + '...',
+              supply: (runningSupply / totalSupply * 100).toFixed(4) + '%'
             })
 
             tokenTrades.push({
               price,
               amount: amountInTokens,
-              timestamp,
-              buyer,
-              phase
+              timestamp: event.timestamp,
+              buyer: event.user,
+              phase: 3,
+              type: 'buy'
             })
-          } catch (parseError) {
-            console.warn('Failed to parse event:', parseError)
+          } else {
+            // For sells: calculate price at current supply, then subtract from supply
+            const supplyPercent = runningSupply / totalSupply
+            const price = basePrice * (1 + 99 * supplyPercent)
+            
+            runningSupply -= event.amount // Decrease supply after sell
+            
+            const amountInTokens = event.amount / 1_000_000_000
+            
+            console.log('📈 SELL:', { 
+              price: price.toFixed(6), 
+              amount: amountInTokens.toFixed(2), 
+              timestamp: event.timestamp,
+              user: event.user.slice(0, 8) + '...',
+              supply: (runningSupply / totalSupply * 100).toFixed(4) + '%'
+            })
+
+            tokenTrades.push({
+              price,
+              amount: amountInTokens,
+              timestamp: event.timestamp,
+              buyer: event.user, // Store seller in buyer field for simplicity
+              phase: 3,
+              type: 'sell'
+            })
           }
         }
 
@@ -212,7 +289,7 @@ export function useChartData(tokenId: string, intervalMinutes: number = 1, autoR
         setCandles(candleData)
 
         // Generate volume data
-        const volData = generateVolumeData(candleData)
+        const volData = generateVolumeData(candleData, tokenTrades)
         setVolumeData(volData)
 
         setError(null)

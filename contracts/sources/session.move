@@ -5,6 +5,8 @@ module memefi::session {
     use sui::table::{Self, Table};
     use sui::event;
     use sui::clock::{Self as clock, Clock};
+    use sui::coin::{Self, Coin};
+    use sui::sui::SUI;
     use memefi::token_v2::{Self, MemeToken};
 
     /// Errors
@@ -102,7 +104,7 @@ module memefi::session {
         clock: &Clock,
         session: &mut TradingSession,
         token: &mut MemeToken,
-        amount: u64,
+        payment: Coin<SUI>,
         ctx: &mut TxContext
     ) {
         let caller = tx_context::sender(ctx);
@@ -110,6 +112,8 @@ module memefi::session {
         // Verify ownership
         assert!(caller == session.owner, ENotOwner);
         assert!(session.state == STATE_ACTIVE, ESessionNotActive);
+        
+        let amount = coin::value(&payment);
         assert!(amount > 0, EInvalidAmount);
 
         // Check phase
@@ -121,7 +125,7 @@ module memefi::session {
 
         // Allocate tokens to session (not wallet)
         // This uses the token's internal buy function but doesn't emit wallet events
-        token_v2::buy_tokens(clock, token, amount, ctx);
+        token_v2::buy_tokens(clock, token, payment, ctx);
 
         // Increase session balance
         session.balance = session.balance + amount;

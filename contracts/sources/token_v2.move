@@ -2,12 +2,15 @@
 /// Simplified token system for fair launch platform
 /// Uses custom balance tracking instead of Sui Coin for easier dynamic token creation
 /// Supports hybrid model: platform balances + wallet withdrawals
+/// WITH BONDING CURVE: Real SUI treasury for buy/sell
 module memefi::token_v2 {
     use sui::table::{Self, Table};
     use sui::event;
     use sui::clock::{Self, Clock};
     use std::string::{Self, String};
     use sui::coin::{Self, Coin, TreasuryCap};
+    use sui::balance::{Self, Balance};
+    use sui::sui::SUI;
     use memefi::wrapped_token::{Self, WRAPPED_TOKEN};
 
     /// Errors
@@ -17,6 +20,8 @@ module memefi::token_v2 {
     const EInvalidPhase: u64 = 4;
     const EWithdrawalNotAllowed: u64 = 5;
     const ENoBalance: u64 = 6;
+    const EInsufficientPayment: u64 = 7;
+    const EInsufficientTreasury: u64 = 8;
 
     /// Launch phases - 4-phase lifecycle
     const PHASE_LAUNCH: u8 = 0;      // Fair-launch rules apply
@@ -24,7 +29,7 @@ module memefi::token_v2 {
     const PHASE_SETTLEMENT: u8 = 2;  // Sessions close, balances applied
     const PHASE_OPEN: u8 = 3;        // Normal public token behavior
 
-    /// A MemeToken with embedded launch rules
+    /// A MemeToken with embedded launch rules and SUI treasury
     public struct MemeToken has key, store {
         id: UID,
         name: String,
@@ -46,6 +51,8 @@ module memefi::token_v2 {
         // Balance tracking
         balances: Table<address, u64>,
         purchases: Table<address, u64>, // Track purchases for max buy enforcement
+        // SUI Treasury - stores all SUI from buys, pays out on sells
+        treasury: Balance<SUI>,
     }
 
     /// Events
@@ -60,8 +67,16 @@ module memefi::token_v2 {
     public struct PurchaseMade has copy, drop {
         token_id: ID,
         buyer: address,
-        amount: u64,
+        token_amount: u64,
+        sui_paid: u64,
         total_bought: u64,
+    }
+
+    public struct TokensSold has copy, drop {
+        token_id: ID,
+        seller: address,
+        token_amount: u64,
+        sui_received: u64,
     }
 
     public struct Transfer has copy, drop {
@@ -125,6 +140,7 @@ module memefi::token_v2 {
             pending_volume: 0,
             balances: table::new(ctx),
             purchases: table::new(ctx),
+            treasury: balance::zero<SUI>(), // Initialize empty treasury
         };
 
         // Emit launch event
@@ -140,13 +156,13 @@ module memefi::token_v2 {
         transfer::share_object(token);
     }
 
-    /// Buy tokens - enforces max buy rules and phase restrictions
-    /// During PRIVATE phase, purchases are accumulated privately (no balance update)
-    /// During other phases, balances are updated immediately
+    /// Buy tokens with SUI - uses bonding curve pricing
+    /// User pays SUI, receives tokens based on current price
+    /// SUI is stored in token's treasury for future sells
     public entry fun buy_tokens(
         clock: &Clock,
         token: &mut MemeToken,
-        amount: u64,
+        mut payment: Coin<SUI>,
         ctx: &mut TxContext
     ) {
         let buyer = tx_context::sender(ctx);
@@ -155,11 +171,17 @@ module memefi::token_v2 {
         // Update phase if needed
         update_phase_internal(token, current_time);
 
+        let payment_amount = coin::value(&payment);
+        assert!(payment_amount > 0, EInsufficientPayment);
+
+        // Calculate how many tokens buyer gets for their SUI
+        // Using bonding curve: as supply increases, price per token increases
+        let token_amount = calculate_tokens_for_sui(token, payment_amount);
+        
         // Check if we have enough supply
-        assert!(token.circulating_supply + amount <= token.total_supply, EInsufficientBalance);
+        assert!(token.circulating_supply + token_amount <= token.total_supply, EInsufficientBalance);
 
         // Check max buy limit ONLY during LAUNCH and PRIVATE phases
-        // After private session ends (SETTLEMENT/OPEN), no restrictions
         if (token.current_phase == PHASE_LAUNCH || token.current_phase == PHASE_PRIVATE) {
             let current_purchased = if (table::contains(&token.purchases, buyer)) {
                 *table::borrow(&token.purchases, buyer)
@@ -167,7 +189,7 @@ module memefi::token_v2 {
                 0
             };
             
-            let new_total = current_purchased + amount;
+            let new_total = current_purchased + token_amount;
             assert!(new_total <= token.max_buy_per_wallet, EExceedsMaxBuy);
 
             // Update purchase tracking
@@ -179,17 +201,18 @@ module memefi::token_v2 {
             };
         };
 
-        // Update balance immediately for ALL phases
-        // Privacy is maintained by not emitting events AND not updating public stats during PRIVATE phase
-        let is_new_holder = !table::contains(&token.balances, buyer);
-        
+        // Add SUI payment to treasury
+        let payment_balance = coin::into_balance(payment);
+        balance::join(&mut token.treasury, payment_balance);
+
+        // Update balance
         if (table::contains(&token.balances, buyer)) {
             let balance_ref = table::borrow_mut(&mut token.balances, buyer);
-            *balance_ref = *balance_ref + amount;
+            *balance_ref = *balance_ref + token_amount;
         } else {
-            table::add(&mut token.balances, buyer, amount);
+            table::add(&mut token.balances, buyer, token_amount);
             
-            // Track holder count: use pending during PRIVATE, else update public
+            // Track holder count
             if (token.current_phase == PHASE_PRIVATE) {
                 token.pending_holder_count = token.pending_holder_count + 1;
             } else {
@@ -197,31 +220,128 @@ module memefi::token_v2 {
             };
         };
 
-        // Update circulating supply (always immediate)
-        token.circulating_supply = token.circulating_supply + amount;
+        // Update circulating supply
+        token.circulating_supply = token.circulating_supply + token_amount;
         
-        // Track volume: use pending during PRIVATE, else update public
+        // Track volume
+        if (token.current_phase == PHASE_PRIVATE) {
+            token.pending_volume = token.pending_volume + token_amount;
+        } else {
+            token.total_volume = token.total_volume + token_amount;
+        };
+
+        // Emit event (skip during PRIVATE phase for privacy)
+        if (token.current_phase != PHASE_PRIVATE) {
+            let total_bought = if (table::contains(&token.purchases, buyer)) {
+                *table::borrow(&token.purchases, buyer)
+            } else {
+                token_amount
+            };
+
+            event::emit(PurchaseMade {
+                token_id: object::uid_to_inner(&token.id),
+                buyer,
+                token_amount,
+                sui_paid: payment_amount,
+                total_bought,
+            });
+        };
+    }
+
+    /// Sell tokens back to the bonding curve for SUI
+    /// Tokens are burned, SUI is paid from treasury
+    public entry fun sell_tokens(
+        clock: &Clock,
+        token: &mut MemeToken,
+        amount: u64,
+        ctx: &mut TxContext
+    ) {
+        let seller = tx_context::sender(ctx);
+        let current_time = clock::timestamp_ms(clock);
+
+        // Update phase if needed
+        update_phase_internal(token, current_time);
+
+        // Check seller has balance
+        assert!(table::contains(&token.balances, seller), ENoBalance);
+        let seller_balance = {
+            let balance = table::borrow(&token.balances, seller);
+            *balance
+        };
+        assert!(seller_balance >= amount, EInsufficientBalance);
+
+        // Calculate SUI to return using bonding curve
+        let sui_to_return = calculate_sui_for_tokens(token, amount);
+        
+        // Check treasury has enough SUI
+        assert!(balance::value(&token.treasury) >= sui_to_return, EInsufficientTreasury);
+
+        // Burn tokens from seller's balance
+        let balance_ref = table::borrow_mut(&mut token.balances, seller);
+        *balance_ref = *balance_ref - amount;
+
+        // Reduce circulating supply
+        token.circulating_supply = token.circulating_supply - amount;
+
+        // Pay seller from treasury
+        let payment = coin::take(&mut token.treasury, sui_to_return, ctx);
+        transfer::public_transfer(payment, seller);
+
+        // Update volume
         if (token.current_phase == PHASE_PRIVATE) {
             token.pending_volume = token.pending_volume + amount;
         } else {
             token.total_volume = token.total_volume + amount;
         };
 
-        // Emit event only for non-private phases (maintain privacy during PRIVATE phase)
+        // Emit event (skip during PRIVATE phase)
         if (token.current_phase != PHASE_PRIVATE) {
-            let total_bought = if (table::contains(&token.purchases, buyer)) {
-                *table::borrow(&token.purchases, buyer)
-            } else {
-                amount
-            };
-
-            event::emit(PurchaseMade {
+            event::emit(TokensSold {
                 token_id: object::uid_to_inner(&token.id),
-                buyer,
-                amount,
-                total_bought,
+                seller,
+                token_amount: amount,
+                sui_received: sui_to_return,
             });
         };
+    }
+
+    /// Calculate how many tokens buyer gets for their SUI payment
+    /// Uses integral of bonding curve: token_amount = sqrt(2 * treasury_delta / k + supply^2) - supply
+    /// Simplified linear approximation for easier math
+    fun calculate_tokens_for_sui(token: &MemeToken, sui_amount: u64): u64 {
+        // Base price: 0.0001 SUI (100,000 MIST) per FULL token (not per base unit!)
+        // With 9 decimals, 1 token = 1,000,000,000 base units
+        let base_price: u64 = 100000; // MIST per full token
+        let decimals_factor: u64 = 1000000000; // 10^9 for 9 decimals
+        
+        // Linear bonding curve: price increases with supply
+        // price = base_price * (1 + supply_percent)
+        let current_price = get_current_price(token);
+        
+        // Calculate tokens in base units
+        // token_base_units = (sui_amount * decimals_factor) / price_per_full_token
+        if (current_price == 0) {
+            return ((sui_amount * decimals_factor) / base_price)
+        };
+        
+        (sui_amount * decimals_factor) / current_price
+    }
+
+    /// Calculate how much SUI seller gets for their tokens
+    /// Uses same bonding curve in reverse
+    fun calculate_sui_for_tokens(token: &MemeToken, token_amount: u64): u64 {
+        // Get price at current supply level (before sell)
+        let current_price = get_current_price(token);
+        let decimals_factor: u64 = 1000000000; // 10^9 for 9 decimals
+        
+        if (current_price == 0) {
+            return 0
+        };
+        
+        // sui_amount = (token_base_units * price_per_full_token) / decimals_factor
+        // Simple calculation - in reality, price would decrease as we sell
+        // This is approximate - could improve with integration
+        (token_amount * current_price) / decimals_factor
     }
 
     /// Transfer tokens between addresses
@@ -350,11 +470,19 @@ module memefi::token_v2 {
         token.total_volume
     }
 
+    /// Get treasury balance (total SUI in bonding curve)
+    public fun get_treasury_balance(token: &MemeToken): u64 {
+        balance::value(&token.treasury)
+    }
+
     /// Calculate current token price using linear bonding curve
     /// Price = base_price + (price_increment * circulating_supply / total_supply)
     /// This creates a linear price increase as more tokens are sold
+    /// Get current token price based on bonding curve
+    /// Returns price in MIST per FULL token (not per base unit)
+    /// With 9 decimals, this means price for 1,000,000,000 base units
     public fun get_current_price(token: &MemeToken): u64 {
-        // Base price: 0.0001 SOL (100000 MIST with 9 decimals)
+        // Base price: 0.0001 SUI (100,000 MIST) per full token
         let base_price: u64 = 100000;
         
         // Maximum price multiplier at 100% supply: 100x base price
