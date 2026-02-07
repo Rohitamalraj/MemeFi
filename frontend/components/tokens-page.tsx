@@ -102,12 +102,12 @@ function TokenCard({ token }: { token: Token }) {
   return (
     <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
       <Link href={`/tokens/${token.id}`}>
-        <Card className="border-2 hover:border-[#AFFF00] transition-all cursor-pointer group">
+        <Card className="border border-[#424242] bg-[#121212]/50 hover:border-primary transition-all cursor-pointer group backdrop-blur-sm overflow-hidden">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 {token.image ? (
-                  <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-[#AFFF00]/20">
+                  <div className="w-12 h-12 overflow-hidden border border-primary/20">
                     <img 
                       src={token.image} 
                       alt={token.name}
@@ -119,40 +119,43 @@ function TokenCard({ token }: { token: Token }) {
                         if (fallback) fallback.classList.remove('hidden');
                       }}
                     />
-                    <div className="hidden w-12 h-12 bg-gradient-to-br from-[#AFFF00] to-[#7AB800] rounded-xl flex items-center justify-center font-black text-xl text-[#121212]">
+                    <div className="hidden w-12 h-12 bg-primary/20 border border-primary/40 flex items-center justify-center font-bold text-lg text-primary font-mono">
                       {token.symbol.slice(0, 2)}
                     </div>
                   </div>
                 ) : (
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#AFFF00] to-[#7AB800] rounded-xl flex items-center justify-center font-black text-xl text-[#121212]">
+                  <div className="w-12 h-12 bg-primary/20 border border-primary/40 flex items-center justify-center font-bold text-lg text-primary font-mono">
                     {token.symbol.slice(0, 2)}
                   </div>
                 )}
                 <div>
-                  <h3 className="font-bold text-lg text-[#121212] group-hover:text-[#AFFF00] transition-colors">
+                  <h3 className="font-bold text-lg text-white group-hover:text-primary transition-colors font-mono">
                     {token.name}
                   </h3>
-                  <p className="text-sm text-[#121212]/60 font-mono">${token.symbol}</p>
+                  <p className="text-sm text-white/60 font-mono">${token.symbol}</p>
                 </div>
               </div>
               <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-2">
                   <div
-                    className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    className={`px-3 py-1 text-xs font-bold font-mono uppercase ${
                       token.phase === "early"
-                        ? "bg-[#AFFF00]/20 text-[#7AB800] border border-[#AFFF00]/50"
-                        : "bg-gray-100 text-gray-700"
+                        ? "bg-primary/20 text-primary border border-primary/50"
+                        : "bg-white/5 text-white/60 border border-white/20"
                     }`}
+                    style={{
+                      clipPath: 'polygon(6px 0, calc(100% - 6px) 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 calc(100% - 6px), 0 6px)',
+                    }}
                   >
                     {token.phase === "early" ? "EARLY" : "PUBLIC"}
                   </div>
-                  <div className="text-xs text-[#121212]/40 font-mono">
+                  <div className="text-xs text-white/40 font-mono">
                     Phase {token.phaseNumber}
                   </div>
                 </div>
                 {token.hasActiveSessions && (
-                  <div className="flex items-center gap-1 text-xs text-[#AFFF00]">
-                    <div className="w-2 h-2 bg-[#AFFF00] rounded-full animate-pulse" />
+                  <div className="flex items-center gap-1 text-xs text-primary font-mono">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
                     Live Session
                   </div>
                 )}
@@ -161,14 +164,14 @@ function TokenCard({ token }: { token: Token }) {
 
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <div className="text-xs text-[#121212]/60 mb-1">Price</div>
-                <div className="font-bold text-[#121212]">{token.price.toFixed(6)} SUI</div>
+                <div className="text-xs text-white/60 mb-1 font-mono uppercase">Price</div>
+                <div className="font-bold text-white font-mono">{token.price.toFixed(6)} SUI</div>
               </div>
               <div>
-                <div className="text-xs text-[#121212]/60 mb-1">24h Change</div>
+                <div className="text-xs text-white/60 mb-1 font-mono uppercase">24h Change</div>
                 <div
-                  className={`font-bold flex items-center gap-1 ${
-                    token.priceChange24h >= 0 ? "text-green-600" : "text-red-600"
+                  className={`font-bold flex items-center gap-1 font-mono ${
+                    token.priceChange24h >= 0 ? "text-green-400" : "text-red-400"
                   }`}
                 >
                   {token.priceChange24h >= 0 ? (
@@ -182,26 +185,26 @@ function TokenCard({ token }: { token: Token }) {
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-xs mb-4">
-              <div className="bg-gray-50 rounded-lg p-2">
-                <div className="text-[#121212]/60 mb-1">Volume</div>
-                <div className="font-bold">{(token.volume24h / 1000).toFixed(0)}K</div>
+              <div className="bg-black/30 border border-[#424242] p-2">
+                <div className="text-white/60 mb-1 font-mono uppercase">Volume</div>
+                <div className="font-bold text-white font-mono">{(token.volume24h / 1000).toFixed(0)}K</div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-2">
-                <div className="text-[#121212]/60 mb-1">MCap</div>
-                <div className="font-bold">{(token.marketCap / 1000000).toFixed(1)}M</div>
+              <div className="bg-black/30 border border-[#424242] p-2">
+                <div className="text-white/60 mb-1 font-mono uppercase">MCap</div>
+                <div className="font-bold text-white font-mono">{(token.marketCap / 1000000).toFixed(1)}M</div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-2">
-                <div className="text-[#121212]/60 mb-1">Holders</div>
-                <div className="font-bold">{token.holders}</div>
+              <div className="bg-black/30 border border-[#424242] p-2">
+                <div className="text-white/60 mb-1 font-mono uppercase">Holders</div>
+                <div className="font-bold text-white font-mono">{token.holders}</div>
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-[#121212]/50">
+            <div className="flex items-center justify-between text-xs text-white/50 font-mono">
               <div className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 {token.launchedAt}
               </div>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-[#AFFF00]" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -237,7 +240,7 @@ export function TokensPage() {
     })
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-20">
+    <div className="min-h-screen bg-background pt-24 pb-20">
       <div className="max-w-7xl mx-auto px-6">
         {/* Header */}
         <motion.div
@@ -245,10 +248,10 @@ export function TokensPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
         >
-          <h1 className="text-5xl md:text-6xl font-black text-[#121212] mb-4">
-            Explore <span className="text-[#AFFF00]">Tokens</span>
+          <h1 className="text-5xl md:text-6xl font-bold text-white mb-4" style={{ fontFamily: 'var(--font-sentient)' }}>
+            Explore <span className="text-primary">Tokens</span>
           </h1>
-          <p className="text-xl text-[#121212]/70 max-w-2xl mx-auto">
+          <p className="text-lg text-white/60 max-w-2xl mx-auto font-mono">
             Discover fair-launched memecoins on Sui
           </p>
         </motion.div>
@@ -262,50 +265,45 @@ export function TokensPage() {
         >
           {/* Search Bar */}
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#121212]/40" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search tokens by name or symbol..."
-              className="w-full pl-12 pr-4 py-4 border-2 border-[#121212]/20 rounded-full focus:border-[#AFFF00] focus:outline-none transition-colors text-lg"
+              className="w-full pl-12 pr-4 py-4 bg-[#121212]/50 border border-[#424242] text-white placeholder:text-white/40 focus:border-primary focus:outline-none transition-colors text-lg font-mono backdrop-blur-sm"
+              style={{
+                clipPath: 'polygon(12px 0, calc(100% - 12px) 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 calc(100% - 12px), 0 12px)',
+              }}
             />
           </div>
 
           {/* Filter Bar */}
           <div className="flex flex-wrap gap-3">
             <div className="flex gap-2">
-              <span className="text-sm font-bold text-[#121212]/60 flex items-center">Sort:</span>
+              <span className="text-sm font-bold text-white/60 flex items-center font-mono uppercase">Sort:</span>
               {(["trending", "new", "volume"] as const).map((sort) => (
                 <Button
                   key={sort}
                   onClick={() => setSortBy(sort)}
                   variant={sortBy === sort ? "default" : "outline"}
                   size="sm"
-                  className={`rounded-full font-bold capitalize ${
-                    sortBy === sort
-                      ? "bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90"
-                      : "border-2 border-[#121212]/20"
-                  }`}
+                  className="font-bold capitalize font-mono"
                 >
                   {sort}
                 </Button>
               ))}
             </div>
-            <div className="h-6 w-px bg-[#121212]/20" />
+            <div className="h-6 w-px bg-[#424242]" />
             <div className="flex gap-2">
-              <span className="text-sm font-bold text-[#121212]/60 flex items-center">Phase:</span>
+              <span className="text-sm font-bold text-white/60 flex items-center font-mono uppercase">Phase:</span>
               {(["all", "early", "public", "open"] as const).map((phase) => (
                 <Button
                   key={phase}
                   onClick={() => setFilterPhase(phase)}
                   variant={filterPhase === phase ? "default" : "outline"}
                   size="sm"
-                  className={`rounded-full font-bold capitalize ${
-                    filterPhase === phase
-                      ? "bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90"
-                      : "border-2 border-[#121212]/20"
-                  }`}
+                  className="font-bold capitalize font-mono"
                 >
                   {phase === "early" && <Shield className="w-3 h-3 mr-1" />}
                   {phase === "public" && <Eye className="w-3 h-3 mr-1" />}
@@ -323,8 +321,8 @@ export function TokensPage() {
             animate={{ opacity: 1 }}
             className="flex flex-col items-center justify-center py-20"
           >
-            <Loader2 className="w-12 h-12 text-[#AFFF00] animate-spin mb-4" />
-            <p className="text-[#121212]/60 text-lg">Loading tokens from blockchain...</p>
+            <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+            <p className="text-white/60 text-lg font-mono">Loading tokens from blockchain...</p>
           </motion.div>
         )}
 
@@ -336,11 +334,11 @@ export function TokensPage() {
             className="text-center py-20"
           >
             <div className="text-6xl mb-4">⚠️</div>
-            <h3 className="text-2xl font-bold text-[#121212] mb-2">Failed to load tokens</h3>
-            <p className="text-[#121212]/60 mb-6">{error}</p>
+            <h3 className="text-2xl font-bold text-white mb-2 font-mono">Failed to load tokens</h3>
+            <p className="text-white/60 mb-6 font-mono">{error}</p>
             <Button 
               onClick={refetch}
-              className="bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold rounded-full px-8"
+              className="font-bold px-8 font-mono"
             >
               Try Again
             </Button>
@@ -379,16 +377,16 @@ export function TokensPage() {
             className="text-center py-20"
           >
             <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-2xl font-bold text-[#121212] mb-2">
+            <h3 className="text-2xl font-bold text-white mb-2 font-mono">
               {displayTokens.length === 0 ? "No tokens launched yet" : "No tokens found"}
             </h3>
-            <p className="text-[#121212]/60 mb-6">
+            <p className="text-white/60 mb-6 font-mono">
               {displayTokens.length === 0 
                 ? "Be the first to launch a token on MemeFi!" 
                 : "Try adjusting your search or filters"}
             </p>
             <Link href="/launch">
-              <Button className="bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold rounded-full px-8">
+              <Button className="font-bold px-8 font-mono">
                 Launch Your Token
               </Button>
             </Link>

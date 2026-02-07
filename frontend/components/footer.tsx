@@ -12,7 +12,7 @@ const socialLinks = [
 ]
 
 const footerLinks = {
-  Product: ["Launch Token", "Explore Sessions", "How It Works", "Roadmap"],
+  Product: ["Launch Token", "Explore Tokens", "How It Works", "Roadmap"],
   Developers: ["Documentation", "GitHub", "API Reference", "Smart Contracts"],
   Resources: ["Blog", "FAQ", "Support", "Brand Kit"],
   Legal: ["Terms of Service", "Privacy Policy", "Cookie Policy"],
@@ -20,18 +20,18 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="bg-[#121212] border-t border-white/10 pt-20 pb-10">
+    <footer className="bg-black border-t border-[#424242] pt-20 pb-10">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid md:grid-cols-5 gap-12 mb-16">
           {/* Brand Column */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <Rocket className="w-8 h-8 text-[#AFFF00]" />
-              <span className="text-2xl font-black text-white">
-                Meme<span className="text-[#AFFF00]">Fi</span>
+              <Rocket className="w-8 h-8 text-primary" />
+              <span className="text-2xl font-bold font-mono text-white">
+                MEME<span className="text-primary">FI</span>
               </span>
             </div>
-            <p className="text-white/70 mb-6 max-w-sm">
+            <p className="text-white/60 mb-6 max-w-sm font-mono text-sm">
               A Sui-native DeFi primitive for fair memecoin launches with privacy-aware early trading sessions.
             </p>
             <div className="flex items-center gap-4">
@@ -41,10 +41,13 @@ export function Footer() {
                   href={social.href}
                   whileHover={{ scale: 1.1, y: -2 }}
                   whileTap={{ scale: 0.95 }}
-                  className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-[#AFFF00]/20 hover:border-[#AFFF00]/50 transition-all group"
+                  className="w-10 h-10 border border-[#424242] bg-[#121212]/30 flex items-center justify-center hover:border-primary hover:bg-primary/10 transition-all group"
                   aria-label={social.label}
+                  style={{
+                    clipPath: 'polygon(8px 0, calc(100% - 8px) 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 calc(100% - 8px), 0 8px)',
+                  }}
                 >
-                  <social.icon className="w-5 h-5 text-white/70 group-hover:text-[#AFFF00] transition-colors" />
+                  <social.icon className="w-5 h-5 text-white/60 group-hover:text-primary transition-colors" />
                 </motion.a>
               ))}
             </div>
@@ -53,13 +56,13 @@ export function Footer() {
           {/* Links Columns */}
           {Object.entries(footerLinks).map(([category, links]) => (
             <div key={category}>
-              <h3 className="text-white font-bold mb-4">{category}</h3>
+              <h3 className="text-white font-bold font-mono uppercase text-sm mb-4">{category}</h3>
               <ul className="space-y-3">
                 {links.map((link) => (
                   <li key={link}>
                     <Link
                       href="#"
-                      className="text-white/70 hover:text-[#AFFF00] transition-colors text-sm"
+                      className="text-white/60 hover:text-primary transition-colors text-sm font-mono"
                     >
                       {link}
                     </Link>
@@ -71,21 +74,21 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-white/50 text-sm">
-            © 2026 MemeFi. Built for <span className="text-[#AFFF00]">HackMoney 2026</span>.
+        <div className="border-t border-[#424242] pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-white/40 text-sm font-mono">
+            © 2026 MemeFi. Built for <span className="text-primary">HackMoney 2026</span>.
           </p>
-          <div className="flex items-center gap-6 text-sm">
-            <span className="text-white/70">Powered by</span>
+          <div className="flex items-center gap-6 text-sm font-mono">
+            <span className="text-white/60">Powered by</span>
             <motion.span
-              className="text-[#AFFF00] font-bold"
+              className="text-primary font-bold"
               whileHover={{ scale: 1.05 }}
             >
               Sui
             </motion.span>
-            <span className="text-white/50">×</span>
+            <span className="text-white/40">×</span>
             <motion.span
-              className="text-[#AFFF00] font-bold"
+              className="text-primary font-bold"
               whileHover={{ scale: 1.05 }}
             >
               ENS
@@ -96,3 +99,4 @@ export function Footer() {
     </footer>
   )
 }
+

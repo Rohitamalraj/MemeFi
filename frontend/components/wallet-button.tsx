@@ -36,7 +36,7 @@ export function WalletButton() {
         <DropdownMenuTrigger asChild>
           <Button
             disabled={isLoading}
-            className="bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold px-6 py-3 rounded-lg"
+            className="bg-[#4DA2FF] text-white hover:bg-[#4DA2FF]/90 font-bold px-6 py-3 rounded-lg"
           >
             <Wallet className="w-4 h-4 mr-2" />
             {isLoading ? 'Connecting...' : 'Connect Wallet'}
@@ -54,7 +54,7 @@ export function WalletButton() {
                 href="https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-[#AFFF00] hover:text-[#AFFF00]/80 underline"
+                className="text-xs text-[#4DA2FF] hover:text-[#4DA2FF]/80 underline"
               >
                 Install Sui Wallet →
               </a>
@@ -68,7 +68,7 @@ export function WalletButton() {
                 <DropdownMenuItem
                   key={wallet.name}
                   onClick={() => handleConnect(wallet.name)}
-                  className="flex items-center gap-3 px-3 py-3 cursor-pointer rounded-lg hover:bg-[#AFFF00]/20 focus:bg-[#AFFF00]/20"
+                  className="flex items-center gap-3 px-3 py-3 cursor-pointer rounded-lg hover:bg-[#4DA2FF]/20 focus:bg-[#4DA2FF]/20"
                 >
                   {wallet.icon && (
                     <img
@@ -94,7 +94,7 @@ export function WalletButton() {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="bg-[#AFFF00] text-[#121212] font-bold border-2 border-[#121212] px-4 py-2 rounded-lg flex items-center">
+      <div className="bg-[#4DA2FF] text-white font-bold border-2 border-[#121212] px-4 py-2 rounded-lg flex items-center">
         <Wallet className="w-4 h-4 mr-2" />
         {currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}
       </div>

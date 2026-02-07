@@ -1,21 +1,15 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter, JetBrains_Mono } from "next/font/google"
+import { JetBrains_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
-import { LenisProvider } from "@/components/lenis-provider"
 import { Providers } from "@/components/providers"
 import { Toaster } from "@/components/ui/sonner"
-import ClickSpark from "@/components/click-spark"
+import { Header } from "@/components/header"
 import "./globals.css"
 
-const _inter = Inter({
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
-  variable: "--font-sans",
-})
-
-const _jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
 })
 
 export const metadata: Metadata = {
@@ -25,7 +19,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#AFFF00",
+  themeColor: "#FFC700",
 }
 
 export default function RootLayout({
@@ -35,18 +29,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`font-sans antialiased`}>
+      <body
+        className={`${jetbrainsMono.variable} antialiased`}
+        suppressHydrationWarning
+      >
         <Providers>
-          <ClickSpark
-            sparkColor="#AFFF00"
-            sparkSize={12}
-            sparkRadius={20}
-            sparkCount={8}
-            duration={400}
-            easing="ease-out"
-          >
-            <LenisProvider>{children}</LenisProvider>
-          </ClickSpark>
+          <Header />
+          {children}
           <Toaster />
         </Providers>
         <Analytics />

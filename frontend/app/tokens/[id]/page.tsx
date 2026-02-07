@@ -87,6 +87,7 @@ export default function TokenTradingPage() {
   const [timeRemaining, setTimeRemaining] = useState(0)
   const [holders, setHolders] = useState<TokenHolder[]>([])
   const [loadingHolders, setLoadingHolders] = useState(true)
+  const [lastTxDigest, setLastTxDigest] = useState<string | null>(null)
 
   // Fetch token data
   useEffect(() => {
@@ -207,6 +208,11 @@ export default function TokenTradingPage() {
         )
 
         if (result.success) {
+          // Store transaction digest for block explorer link
+          if (result.digest) {
+            setLastTxDigest(result.digest)
+          }
+          
           setSuiAmount('')
           // Refresh token data and balance
           const updatedToken = await getTokenById(tokenId)
@@ -247,6 +253,11 @@ export default function TokenTradingPage() {
         )
 
         if (result.success) {
+          // Store transaction digest for block explorer link
+          if (result.digest) {
+            setLastTxDigest(result.digest)
+          }
+          
           setSuiAmount('')
           // Refresh token data and balance
           const updatedToken = await getTokenById(tokenId)
@@ -302,6 +313,11 @@ export default function TokenTradingPage() {
       )
 
       if (result.success) {
+        // Store transaction digest for block explorer link
+        if (result.digest) {
+          setLastTxDigest(result.digest)
+        }
+        
         // Refresh token data and balance
         const updatedToken = await getTokenById(tokenId)
         if (updatedToken) setToken(updatedToken)
@@ -753,6 +769,36 @@ export default function TokenTradingPage() {
                       ? `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${formatNumber(parseFloat(suiAmount) / token.currentPrice)} ${token.symbol}`
                       : `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${token.symbol}`}
                   </Button>
+
+                  {/* Block Explorer Link */}
+                  {lastTxDigest && (
+                    <div className="mt-4 p-4 bg-[#AFFF00]/10 border-2 border-[#AFFF00]/30 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0">
+                          <svg className="w-5 h-5 text-[#AFFF00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-bold text-[#AFFF00] mb-1">Transaction Successful!</div>
+                          <p className="text-sm text-gray-300 mb-2">
+                            View your transaction on the block explorer:
+                          </p>
+                          <a
+                            href={`https://suiscan.xyz/testnet/tx/${lastTxDigest}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-sm text-[#AFFF00] hover:text-[#AFFF00]/80 underline break-all"
+                          >
+                            <span className="font-mono">{lastTxDigest.slice(0, 20)}...{lastTxDigest.slice(-20)}</span>
+                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Phase 0 (LAUNCH) - No Trading Banner */}
                   {currentPhase === 0 && (
