@@ -4,6 +4,7 @@ import { useCurrentAccount, useDisconnectWallet, useWallets, useConnectWallet } 
 import { Button } from '@/components/ui/button';
 import { Wallet, LogOut, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
+import { useEnsName } from '@/hooks/use-ens-name';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ export function WalletButton() {
   const { mutate: disconnect } = useDisconnectWallet();
   const wallets = useWallets();
   const { mutate: connect, isLoading } = useConnectWallet();
+  const { ensName } = useEnsName();
 
   const handleConnect = (walletName: string) => {
     const wallet = wallets.find((w) => w.name === walletName);
@@ -96,7 +98,7 @@ export function WalletButton() {
     <div className="flex items-center gap-2">
       <div className="bg-[#AFFF00] text-[#121212] font-bold border-2 border-[#121212] px-4 py-2 rounded-lg flex items-center">
         <Wallet className="w-4 h-4 mr-2" />
-        {currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}
+        {ensName || `${currentAccount.address.slice(0, 6)}...${currentAccount.address.slice(-4)}`}
       </div>
       <Button
         variant="outline"

@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Wallet, TrendingUp, Clock, ExternalLink, Activity, DollarSign } from "lucide-react"
+import { Wallet, TrendingUp, Clock, ExternalLink, Activity, DollarSign, Globe, AlertCircle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useWalletConnection } from "@/lib/use-wallet"
 import { getSuiClient, getTokenById } from "@/lib/sui-client"
 import { MEMEFI_CONFIG } from "@/lib/contract-config"
+import { ENSRegistrationModal } from "@/components/ens-registration-modal"
+import { useWalletMapping } from "@/hooks/use-wallet-mapping"
 
 interface TokenHolding {
   tokenId: string
@@ -53,6 +55,14 @@ export function PortfolioPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [totalValue, setTotalValue] = useState(0)
+  const [isEnsModalOpen, setIsEnsModalOpen] = useState(false)
+  
+  const { currentMapping, isMapped } = useWalletMapping()
+
+  // Check if currently connected wallet matches the mapping
+  const isCorrectWallet = currentMapping && address 
+    ? currentMapping.suiAddress.toLowerCase() === address.toLowerCase()
+    : true // If no mapping or no address, no validation needed
 
   useEffect(() => {
     if (!address) {
@@ -195,6 +205,119 @@ export function PortfolioPage() {
           <p className="text-xl text-[#121212]/70">
             Track your holdings and transaction history
           </p>
+        </motion.div>
+
+        {/* ENS Registration Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mb-8"
+        >
+          <Card className={`border-2 ${isMapped && isCorrectWallet ? 'border-green-500 bg-gradient-to-br from-green-500/10 to-white' : 'border-[#AFFF00] bg-gradient-to-br from-[#AFFF00]/10 to-white'}`}>
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Globe className={`w-6 h-6 ${isMapped && isCorrectWallet ? 'text-green-600' : 'text-[#7AB800]'}`} />
+                    <h3 className="text-lg font-bold text-[#121212]">
+                      {isMapped && isCorrectWallet ? 'ENS Cross-Chain Setup' : 'Register ENS Name'}
+                    </h3>
+                  </div>
+                  
+                  {isMapped && isCorrectWallet && currentMapping ? (
+                    <div className="space-y-2">
+                      {/* Wallet Mismatch Warning */}
+                      {!isCorrectWallet && (
+                        <div className="mb-3 p-3 bg-red-50 border-2 border-red-500 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-bold text-red-700 mb-1">⚠️ Wrong Wallet Connected</p>
+                              <p className="text-xs text-red-600 mb-2">
+                                You're connected with a different wallet than the one mapped to <strong>{currentMapping.ensName}</strong>
+                              </p>
+                              <div className="space-y-1 text-xs">
+                                <p className="text-red-600">
+                                  <strong>Mapped Sui Wallet:</strong> <span className="font-mono">{currentMapping.suiAddress.slice(0, 10)}...{currentMapping.suiAddress.slice(-8)}</span>
+                                </p>
+                                <p className="text-red-600">
+                                  <strong>Connected Sui Wallet:</strong> <span className="font-mono">{address?.slice(0, 10)}...{address?.slice(-8)}</span>
+                                </p>
+                              </div>
+                              <p className="text-xs text-red-600 mt-2 font-semibold">
+                                Please reconnect with the correct wallet to use {currentMapping.ensName}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <p className="text-sm text-[#121212]/70 mb-3">
+                        Your ENS is mapped to your Sui wallet for cross-chain transactions
+                      </p>
+                      <div className="bg-white/50 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[#121212]/60">Your Identity:</span>
+                          <span className={`font-mono font-bold text-base ${isCorrectWallet ? 'text-green-600' : 'text-gray-400'}`}>
+                            {currentMapping.ensName} {isCorrectWallet ? '✓' : '⚠'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[#121212]/60">Mapped ETH Address:</span>
+                          <span className="font-mono text-xs">{currentMapping.ethAddress.slice(0, 6)}...{currentMapping.ethAddress.slice(-4)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[#121212]/60">Mapped Sui Address:</span>
+                          <span className={`font-mono text-xs ${isCorrectWallet ? 'text-green-600 font-semibold' : 'text-gray-500'}`}>
+                            {currentMapping.suiAddress.slice(0, 6)}...{currentMapping.suiAddress.slice(-4)}
+                            {isCorrectWallet && ' ✓'}
+                          </span>
+                        </div>
+                        {address && (
+                          <div className="flex items-center justify-between text-sm pt-2 border-t">
+                            <span className="text-[#121212]/60">Currently Connected:</span>
+                            <span className={`font-mono text-xs ${isCorrectWallet ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}`}>
+                              {address.slice(0, 6)}...{address.slice(-4)}
+                              {isCorrectWallet ? ' ✓' : ' ✗'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {isCorrectWallet ? (
+                        <p className="text-xs text-green-600 mt-2 font-semibold">
+                          ✅ <strong>{currentMapping.ensName}</strong> is active and will be displayed everywhere instead of wallet addresses!
+                        </p>
+                      ) : (
+                        <p className="text-xs text-red-600 mt-2 font-semibold">
+                          ⚠️ Connect the correct wallet to use <strong>{currentMapping.ensName}</strong>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-[#121212]/70">
+                        Register an ENS name and map it to your Sui wallet for seamless cross-chain transactions
+                      </p>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">Register ENS</span>
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">Map to ETH</span>
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Map to Sui</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <Button 
+                  onClick={() => setIsEnsModalOpen(true)}
+                  className="ml-4 bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 whitespace-nowrap"
+                  size="lg"
+                >
+                  {isMapped ? 'View Setup' : 'Get Started'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* Total Value Card */}
@@ -344,6 +467,12 @@ export function PortfolioPage() {
           )}
         </motion.div>
       </div>
+
+      {/* ENS Registration Modal */}
+      <ENSRegistrationModal 
+        isOpen={isEnsModalOpen} 
+        onClose={() => setIsEnsModalOpen(false)} 
+      />
     </div>
   )
 }

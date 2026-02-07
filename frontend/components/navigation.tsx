@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useLenis } from "lenis/react"
 import { Menu, X, Rocket, Shield, Zap } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { WalletButton } from "@/components/wallet-button"
 
 const linkVariants = {
@@ -137,6 +136,7 @@ export function Navigation() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5 }}
           >
+            {/* Sui Wallet Button - Shows ENS name if mapped */}
             <WalletButton />
           </motion.div>
         </div>
@@ -189,9 +189,12 @@ export function Navigation() {
                   </Link>
                 )
               ))}
-              <Button className="w-full bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold">
-                Connect Wallet
-              </Button>
+              
+              {/* Mobile Wallet Button */}
+              <div className="pt-2">
+                {/* Sui Wallet - Shows ENS name if mapped */}
+                <WalletButton />
+              </div>
             </div>
           </motion.div>
         )}

@@ -3,11 +3,13 @@
 import { ConnectButton, useCurrentAccount, useDisconnectWallet } from '@mysten/dapp-kit';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import { useEnsName } from '@/hooks/use-ens-name';
 
 export function WalletConnectButton() {
   const currentAccount = useCurrentAccount();
   const { mutate: disconnect } = useDisconnectWallet();
   const [isOpen, setIsOpen] = useState(false);
+  const { ensName } = useEnsName();
 
   if (currentAccount) {
     return (
@@ -16,7 +18,7 @@ export function WalletConnectButton() {
         variant="outline"
         className="rounded-full border-lime/20 bg-charcoal/50 text-lime hover:bg-lime hover:text-charcoal"
       >
-        {currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}
+        {ensName || `${currentAccount.address.slice(0, 6)}...${currentAccount.address.slice(-4)}`}
       </Button>
     );
   }
@@ -33,12 +35,13 @@ export function WalletConnectButton() {
 export function CustomWalletConnect() {
   const currentAccount = useCurrentAccount();
   const { mutate: disconnect } = useDisconnectWallet();
+  const { ensName } = useEnsName();
 
   if (currentAccount) {
     return (
       <div className="flex items-center gap-3">
         <div className="rounded-full bg-lime/10 px-4 py-2 text-sm text-lime">
-          {currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}
+          {ensName || `${currentAccount.address.slice(0, 6)}...${currentAccount.address.slice(-4)}`}
         </div>
         <Button
           onClick={() => disconnect()}

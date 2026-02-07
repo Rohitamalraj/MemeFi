@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { TransactionBlock } from '@mysten/sui.js/transactions'
 import { MEMEFI_CONFIG } from '@/lib/contract-config'
 import { TradingChart } from '@/components/trading-chart'
+import { getEnsNameFromSuiAddress } from '@/lib/wallet-mapping-storage'
 
 /**
  * Token Trading Page - Displays REAL on-chain data from Sui blockchain
@@ -56,6 +57,14 @@ function formatTimeRemaining(seconds: number): string {
   if (hours > 0) return `${hours}h ${minutes}m`
   if (minutes > 0) return `${minutes}m ${secs}s`
   return `${secs}s`
+}
+
+function formatHolderAddress(address: string): string {
+  const ensName = getEnsNameFromSuiAddress(address)
+  if (ensName) {
+    return ensName
+  }
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
 function calculateCurrentPhase(
@@ -575,7 +584,7 @@ export default function TokenTradingPage() {
                           </div>
                           <div>
                             <div className="font-mono text-sm text-white">
-                              {holder.address.slice(0, 6)}...{holder.address.slice(-4)}
+                              {formatHolderAddress(holder.address)}
                             </div>
                             <div className="text-xs text-gray-400">
                               {formatNumber(holder.balance)} {token.symbol}
