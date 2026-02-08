@@ -3,7 +3,7 @@
 
 export const MEMEFI_CONFIG = {
   // Network configuration
-  network: 'testnet', // 'devnet' | 'testnet' | 'mainnet'
+  network: 'testnet' as 'devnet' | 'testnet' | 'mainnet',
   
   // Contract addresses (update after deployment)
   packageId: '0xea7d648351f216544ed0db53b51256490ab18e0d6965cebcfbc40abcae84a88b',
@@ -85,6 +85,6 @@ export function getExplorerUrl(type: 'tx' | 'object' | 'address', id: string): s
 }
 
 // Helper to get full function name
-export function getFunctionName(module: 'token' | 'session', fn: string): string {
+export function getFunctionName(module: 'token' | 'session', fn: string): `${string}::${string}::${string}` {
   return `${MEMEFI_CONFIG.packageId}::${MEMEFI_CONFIG.modules[module]}::${fn}`;
 }

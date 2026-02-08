@@ -19,6 +19,7 @@ export interface CreateTokenParams {
   symbol: string;
   totalSupply: number;
   maxBuyPerWallet: number;
+  earlyPhaseDurationMs: number;
   phaseDurationMs: number;
   transfersLocked: boolean;
   decimals?: number; // Optional, defaults to 9
@@ -262,6 +263,7 @@ export async function getAllTokens(): Promise<MemeTokenData[]> {
     console.log('Querying tokens of type:', objectType);
     
     const response = await client.getOwnedObjects({
+      owner: '0x0', // Placeholder - shared objects use getAllTokensFromEvents instead
       filter: {
         StructType: objectType,
       },
@@ -293,6 +295,10 @@ export async function getAllTokens(): Promise<MemeTokenData[]> {
           currentPhase: Number(fields.current_phase || 0),
           launchTime: Number(fields.launch_time || 0),
           creator: fields.creator || '',
+          holderCount: Number(fields.holder_count || 0),
+          totalVolume: Number(fields.total_volume || 0),
+          currentPrice: Number(fields.current_price || 0),
+          marketCap: Number(fields.market_cap || 0),
         });
         
         console.log('🪙 Token parsed:', {
@@ -546,7 +552,7 @@ export async function getAllTokensFromEvents(): Promise<MemeTokenData[]> {
 
 export interface TradingSessionData {
   id: string;
-  owner: address;
+  owner: string;
   state: number; // 0 = ACTIVE, 1 = SETTLED
   tokenId: string;
   balance: number;
@@ -554,10 +560,10 @@ export interface TradingSessionData {
   // Additional fields from shared session model
   sessionName?: string;
   tokenName?: string;
-  creator?: address;
+  creator?: string;
   startTime?: number;
   endTime?: number;
-  participants?: address[];
+  participants?: string[];
   volume?: number;
 }
 

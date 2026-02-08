@@ -20,8 +20,8 @@ interface SuiProviderProps {
 
 export function SuiProvider({ children, queryClient }: SuiProviderProps) {
   return (
-    <SuiClientProvider networks={networkConfig} defaultNetwork={MEMEFI_CONFIG.network}>
-      <WalletProvider autoConnect queryClient={queryClient}>
+    <SuiClientProvider networks={networkConfig} defaultNetwork={MEMEFI_CONFIG.network as "testnet" | "mainnet" | "devnet"}>
+      <WalletProvider autoConnect>
         {children}
       </WalletProvider>
     </SuiClientProvider>

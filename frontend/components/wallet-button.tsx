@@ -16,7 +16,7 @@ export function WalletButton() {
   const currentAccount = useCurrentAccount();
   const { mutate: disconnect } = useDisconnectWallet();
   const wallets = useWallets();
-  const { mutate: connect, isLoading } = useConnectWallet();
+  const { mutate: connect, isPending: isLoading } = useConnectWallet();
   const { ensName } = useEnsName();
 
   const handleConnect = (walletName: string) => {
@@ -82,7 +82,7 @@ export function WalletButton() {
                   <div className="flex-1">
                     <p className="font-semibold text-white font-mono">{wallet.name}</p>
                     <p className="text-xs text-white/60 font-mono">
-                      {wallet.installed ? '✓ Installed' : '⚠ Not Installed'}
+                      {(wallet as any).installed ? '✓ Installed' : '⚠ Not Installed'}
                     </p>
                   </div>
                 </DropdownMenuItem>

@@ -164,7 +164,9 @@ export function useEnsRegistration() {
     try {
       setIsLoading(true)
       setError(null)
-      if (!address || !walletClient || !publicClient) { setError('Wallet not connected'); setIsLoading(false); return false }
+      if (!address) { setError('Wallet not connected. Please connect MetaMask.'); setIsLoading(false); return false }
+      if (!publicClient) { setError('Network error. Please check your connection.'); setIsLoading(false); return false }
+      if (!walletClient) { setError('Wrong network. Please switch MetaMask to Sepolia testnet.'); setIsLoading(false); return false }
       
       const cleanName = name.replace('.eth', '').toLowerCase()
       if (!validateName(name)) { setIsLoading(false); return false }
@@ -200,6 +202,7 @@ export function useEnsRegistration() {
         abi: ETH_REGISTRAR_ABI,
         functionName: 'commit',
         args: [commitment],
+        gas: BigInt(100_000),
       })
 
       // Wait for confirmation
@@ -233,7 +236,9 @@ export function useEnsRegistration() {
     try {
       setIsLoading(true)
       setError(null)
-      if (!address || !walletClient || !publicClient) { setError('Wallet not connected'); setIsLoading(false); return false }
+      if (!address) { setError('Wallet not connected. Please connect MetaMask.'); setIsLoading(false); return false }
+      if (!publicClient) { setError('Network error. Please check your connection.'); setIsLoading(false); return false }
+      if (!walletClient) { setError('Wrong network. Please switch MetaMask to Sepolia testnet.'); setIsLoading(false); return false }
       
       const cleanName = name.replace('.eth', '').toLowerCase()
       
@@ -271,6 +276,7 @@ export function useEnsRegistration() {
       }
 
       // Register with same Registration struct
+      // Explicit gas limit to stay under Sepolia's 16,777,216 cap
       const registerTxHash = await (walletClient as any).writeContract({
         account: address,
         address: ETH_REGISTRAR_CONTROLLER,
@@ -278,6 +284,7 @@ export function useEnsRegistration() {
         functionName: 'register',
         args: [registration],
         value: priceWithBuffer,
+        gas: BigInt(500_000),
       })
 
       // Wait for confirmation

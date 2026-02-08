@@ -14,7 +14,7 @@ const mobileMenuVariants = {
     height: "auto",
     transition: {
       duration: 0.3,
-      ease: [0.25, 0.4, 0.25, 1],
+      ease: [0.25, 0.4, 0.25, 1] as [number, number, number, number],
     },
   },
   exit: {
@@ -22,7 +22,7 @@ const mobileMenuVariants = {
     height: 0,
     transition: {
       duration: 0.2,
-      ease: [0.25, 0.4, 0.25, 1],
+      ease: [0.25, 0.4, 0.25, 1] as [number, number, number, number],
     },
   },
 }
@@ -34,7 +34,7 @@ export function Navigation() {
   const scrollToSection = (id: string) => {
     const element = document.querySelector(id)
     if (element && lenis) {
-      lenis.scrollTo(element, { offset: -100 })
+      lenis.scrollTo(element as unknown as HTMLElement, { offset: -100 })
     }
     setMobileMenuOpen(false)
   }

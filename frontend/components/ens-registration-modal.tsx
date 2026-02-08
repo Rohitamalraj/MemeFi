@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEnsRegistration } from '@/hooks/use-ens-registration'
 import { useWalletMapping } from '@/hooks/use-wallet-mapping'
-import { useAccount } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi'
+import { injected } from 'wagmi/connectors'
+import { sepolia } from 'wagmi/chains'
 import { useWalletConnection } from '@/lib/use-wallet'
 import {
   Dialog,
@@ -33,10 +35,38 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
   const [step, setStep] = useState<RegistrationStep>('ens-register')
 
   // Wagmi hooks for Ethereum wallet
-  const { address: ethAddress, isConnected: isEthConnected } = useAccount()
+  const { address: ethAddress, isConnected: isEthConnected, chain: currentChain } = useAccount()
+  const { connect: connectEth, isPending: isEthConnecting } = useConnect()
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain()
   
   // Sui wallet hook
   const { address: suiAddress, isConnected: isSuiConnected } = useWalletConnection()
+
+  // Whether we're on the correct chain (Sepolia)
+  const isOnSepolia = currentChain?.id === sepolia.id
+  const needsChainSwitch = isEthConnected && !isOnSepolia
+
+  // Connect MetaMask handler - connect and switch to Sepolia
+  const handleConnectMetaMask = async () => {
+    try {
+      connectEth(
+        { connector: injected() },
+        {
+          onSuccess: () => {
+            // After connecting, switch to Sepolia if needed
+            switchChain({ chainId: sepolia.id })
+          },
+        }
+      )
+    } catch (err) {
+      console.error('MetaMask connection failed:', err)
+    }
+  }
+
+  // Switch to Sepolia handler
+  const handleSwitchToSepolia = () => {
+    switchChain({ chainId: sepolia.id })
+  }
 
   const {
     isLoading: ensLoading,
@@ -257,6 +287,38 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                 </div>
               )}
 
+              {/* Wallet Connection Status */}
+              {!isEthConnected && (
+                <div className="flex items-center gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <Wallet className="w-5 h-5 text-yellow-400 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-yellow-400 font-mono">MetaMask not connected</p>
+                    <p className="text-xs text-white/50 font-mono">Connect your Ethereum wallet to register an ENS name</p>
+                  </div>
+                </div>
+              )}
+
+              {isEthConnected && needsChainSwitch && (
+                <div className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-orange-400 font-mono">Wrong Network</p>
+                    <p className="text-xs text-white/50 font-mono">Currently on {currentChain?.name || 'unknown'}. Switch to Sepolia to register ENS.</p>
+                  </div>
+                </div>
+              )}
+
+              {isEthConnected && isOnSepolia && (
+                <div className="flex items-center gap-3 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+                  <Wallet className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-primary font-mono">MetaMask Connected (Sepolia)</p>
+                    <p className="text-xs text-white/50 font-mono truncate">{ethAddress}</p>
+                  </div>
+                  <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
+                </div>
+              )}
+
               <div className="flex gap-2 pt-4">
                 {step === 'ens-register' && isAvailable === null && (
                   <Button
@@ -298,7 +360,47 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                       </Button>
                     )}
 
-                    {(step === 'ens-register' || (step === 'ens-waiting' && timeRemaining <= 0)) && (
+                    {!isEthConnected && step === 'ens-register' && (
+                      <Button
+                        onClick={handleConnectMetaMask}
+                        disabled={isEthConnecting}
+                        className="flex-1 bg-[#F6851B] text-white hover:bg-[#E2761B] font-bold font-mono"
+                      >
+                        {isEthConnecting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Connecting...
+                          </>
+                        ) : (
+                          <>
+                            <Wallet className="w-4 h-4 mr-2" />
+                            Connect MetaMask
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {isEthConnected && needsChainSwitch && step === 'ens-register' && (
+                      <Button
+                        onClick={handleSwitchToSepolia}
+                        disabled={isSwitchingChain}
+                        className="flex-1 bg-[#F6851B] text-white hover:bg-[#E2761B] font-bold font-mono"
+                      >
+                        {isSwitchingChain ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Switching...
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="w-4 h-4 mr-2" />
+                            Switch to Sepolia
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {isEthConnected && isOnSepolia && (step === 'ens-register' || (step === 'ens-waiting' && timeRemaining <= 0)) && (
                       <Button
                         onClick={handleRegisterClick}
                         disabled={!canRegister}

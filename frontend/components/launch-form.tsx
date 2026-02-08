@@ -32,7 +32,7 @@ const fadeUpVariants = {
     transition: {
       delay: i * 0.1,
       duration: 0.6,
-      ease: "easeInOut",
+      ease: "easeInOut" as const,
     },
   }),
 }
