@@ -113,29 +113,36 @@ export function PortfolioPage() {
     try {
       const client = getSuiClient()
 
-      // Fetch SUI balance and purchase events in parallel
-      const [suiBalance, events] = await Promise.all([
+      // Fetch SUI balance and both purchase and sell events in parallel
+      const [suiBalance, purchaseEvents, sellEvents] = await Promise.all([
         fetchSuiBalance(),
         client.queryEvents({
           query: {
             MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::PurchaseMade`
           },
           order: 'descending',
+        }),
+        client.queryEvents({
+          query: {
+            MoveEventType: `${MEMEFI_CONFIG.packageId}::token_v2::TokensSold`
+          },
+          order: 'descending',
         })
       ])
 
-      console.log('📊 Fetched events:', events.data.length)
+      console.log('📊 Fetched purchase events:', purchaseEvents.data.length)
+      console.log('📊 Fetched sell events:', sellEvents.data.length)
       console.log('💰 SUI Balance:', suiBalance)
 
       // Group by token to calculate holdings and investment details
       const holdingsMap = new Map<string, { 
         balance: number; 
-        txs: Array<{ digest: string; timestamp: number; amount: number; suiSpent: number }>
+        txs: Array<{ digest: string; timestamp: number; amount: number; suiAmount: number; type: 'buy' | 'sell' }>
       }>()
       const transactionsList: Transaction[] = []
 
       // Process purchase events
-      for (const event of events.data) {
+      for (const event of purchaseEvents.data) {
         const parsedJson = event.parsedJson as any
         const buyer = parsedJson.buyer
         const tokenId = parsedJson.token_id
@@ -143,7 +150,7 @@ export function PortfolioPage() {
         const suiAmount = Number(parsedJson.sui_paid) / 1_000_000_000 // Convert from MIST to SUI
         const timestamp = Number(event.timestampMs)
 
-        console.log('🔍 Processing event:', { buyer, tokenId, amount, suiAmount, userAddress: address })
+        console.log('🔍 Processing purchase event:', { buyer, tokenId, amount, suiAmount, userAddress: address })
 
         // Only include transactions for this user
         if (buyer === address) {
@@ -157,7 +164,37 @@ export function PortfolioPage() {
             digest: event.id.txDigest,
             timestamp,
             amount,
-            suiSpent: suiAmount,
+            suiAmount: suiAmount,
+            type: 'buy'
+          })
+        }
+      }
+
+      // Process sell events
+      for (const event of sellEvents.data) {
+        const parsedJson = event.parsedJson as any
+        const seller = parsedJson.seller
+        const tokenId = parsedJson.token_id
+        const amount = Number(parsedJson.token_amount) / 1_000_000_000 // Convert from smallest unit to tokens
+        const suiAmount = Number(parsedJson.sui_received) / 1_000_000_000 // Convert from MIST to SUI
+        const timestamp = Number(event.timestampMs)
+
+        console.log('🔍 Processing sell event:', { seller, tokenId, amount, suiAmount, userAddress: address })
+
+        // Only include transactions for this user
+        if (seller === address) {
+          if (!holdingsMap.has(tokenId)) {
+            holdingsMap.set(tokenId, { balance: 0, txs: [] })
+          }
+
+          const holding = holdingsMap.get(tokenId)!
+          holding.balance -= amount // Subtract for sells
+          holding.txs.push({
+            digest: event.id.txDigest,
+            timestamp,
+            amount,
+            suiAmount: suiAmount,
+            type: 'sell'
           })
         }
       }
@@ -179,13 +216,33 @@ export function PortfolioPage() {
           
           if (token && data.balance > 0) {
             const currentValue = data.balance * token.currentPrice
-            const invested = data.txs.reduce((sum, tx) => sum + tx.suiSpent, 0)
-            const averagePrice = invested / data.balance
-            const profitLoss = currentValue - invested
-            const profitLossPercent = invested > 0 ? (profitLoss / invested) * 100 : 0
+            
+            // Calculate investment properly handling buys and sells
+            let totalInvestedForToken = 0
+            let totalTokensBought = 0
+            
+            // First pass: calculate total invested and tokens bought
+            for (const tx of data.txs) {
+              if (tx.type === 'buy') {
+                totalInvestedForToken += tx.suiAmount
+                totalTokensBought += tx.amount
+              }
+            }
+            
+            // Second pass: subtract proportional investment for sells
+            for (const tx of data.txs) {
+              if (tx.type === 'sell' && totalTokensBought > 0) {
+                const proportionalInvestment = (tx.amount / totalTokensBought) * totalInvestedForToken
+                totalInvestedForToken -= proportionalInvestment
+              }
+            }
+            
+            const averagePrice = totalTokensBought > 0 ? totalInvestedForToken / totalTokensBought : 0
+            const profitLoss = currentValue - totalInvestedForToken
+            const profitLossPercent = totalInvestedForToken > 0 ? (profitLoss / totalInvestedForToken) * 100 : 0
             
             totalTokenValue += currentValue
-            totalInvested += invested
+            totalInvested += totalInvestedForToken
 
             holdingsArray.push({
               tokenId,
@@ -196,7 +253,7 @@ export function PortfolioPage() {
               value: currentValue,
               imageUrl: token.imageUrl,
               priceChange24h: Math.random() * 20 - 10, // Simulated until real price API
-              totalInvested: invested,
+              totalInvested: totalInvestedForToken,
               averagePrice: averagePrice,
               profitLoss: profitLoss,
               profitLossPercent: profitLossPercent,
@@ -210,9 +267,9 @@ export function PortfolioPage() {
                 tokenName: token.name,
                 tokenSymbol: token.symbol,
                 amount: tx.amount,
-                price: tx.suiSpent / tx.amount,
-                totalCost: tx.suiSpent,
-                type: 'buy'
+                price: tx.suiAmount / tx.amount,
+                totalCost: tx.suiAmount,
+                type: tx.type
               })
             }
           }
@@ -604,8 +661,12 @@ export function PortfolioPage() {
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-bold font-mono">
-                            BUY
+                          <span className={`px-2 py-0.5 text-xs font-bold font-mono ${
+                            tx.type === 'buy' 
+                              ? 'bg-green-500/20 text-green-400' 
+                              : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {tx.type.toUpperCase()}
                           </span>
                           <span className="font-bold text-white font-mono">
                             {formatNumber(tx.amount)} {tx.tokenSymbol}
