@@ -141,16 +141,16 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[550px]" onInteractOutside={(e) => {
+      <DialogContent className="sm:max-w-[550px] bg-black border-[#424242] text-white" onInteractOutside={(e) => {
         if (step !== 'ens-register' || isLoading) {
           e.preventDefault()
         }
       }}>
         <DialogHeader>
-          <DialogTitle className="text-2xl">
+          <DialogTitle className="text-2xl font-sentient text-white">
             {step === 'complete' ? '🎉 Setup Complete!' : 'Cross-Chain ENS Setup'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="font-mono text-white/60">
             {step === 'complete' 
               ? 'Your ENS is now mapped to your Sui wallet'
               : 'Register ENS and map it to your Sui wallet for cross-chain transactions'}
@@ -160,48 +160,48 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
         {/* Progress Indicator */}
         <div className="flex items-center justify-between mb-4 px-2">
           <div className="flex flex-col items-center">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-mono ${
               ['ens-register', 'ens-waiting', 'ens-complete', 'wallet-mapping', 'complete'].includes(step)
-                ? 'bg-[#AFFF00] text-[#121212]'
-                : 'bg-gray-200 text-gray-400'
+                ? 'bg-primary text-black'
+                : 'bg-[#424242] text-white/40'
             }`}>
               {['ens-complete', 'wallet-mapping', 'complete'].includes(step) ? <CheckCircle2 className="w-5 h-5" /> : '1'}
             </div>
-            <span className="text-xs mt-1">ENS</span>
+            <span className="text-xs mt-1 font-mono text-white/60">ENS</span>
           </div>
           
-          <div className="flex-1 h-0.5 bg-gray-200 mx-2">
+          <div className="flex-1 h-0.5 bg-[#424242] mx-2">
             <div className={`h-full transition-all ${
-              ['wallet-mapping', 'complete'].includes(step) ? 'bg-[#AFFF00] w-full' : 'bg-gray-200 w-0'
+              ['wallet-mapping', 'complete'].includes(step) ? 'bg-primary w-full' : 'bg-[#424242] w-0'
             }`} />
           </div>
 
           <div className="flex flex-col items-center">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-mono ${
               ['wallet-mapping', 'complete'].includes(step)
-                ? 'bg-[#AFFF00] text-[#121212]'
-                : 'bg-gray-200 text-gray-400'
+                ? 'bg-primary text-black'
+                : 'bg-[#424242] text-white/40'
             }`}>
               {step === 'complete' ? <CheckCircle2 className="w-5 h-5" /> : '2'}
             </div>
-            <span className="text-xs mt-1">Map</span>
+            <span className="text-xs mt-1 font-mono text-white/60">Map</span>
           </div>
 
-          <div className="flex-1 h-0.5 bg-gray-200 mx-2">
+          <div className="flex-1 h-0.5 bg-[#424242] mx-2">
             <div className={`h-full transition-all ${
-              step === 'complete' ? 'bg-[#AFFF00] w-full' : 'bg-gray-200 w-0'
+              step === 'complete' ? 'bg-primary w-full' : 'bg-[#424242] w-0'
             }`} />
           </div>
 
           <div className="flex flex-col items-center">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-mono ${
               step === 'complete'
-                ? 'bg-[#AFFF00] text-[#121212]'
-                : 'bg-gray-200 text-gray-400'
+                ? 'bg-primary text-black'
+                : 'bg-[#424242] text-white/40'
             }`}>
               {step === 'complete' ? <CheckCircle2 className="w-5 h-5" /> : '3'}
             </div>
-            <span className="text-xs mt-1">Done</span>
+            <span className="text-xs mt-1 font-mono text-white/60">Done</span>
           </div>
         </div>
 
@@ -216,7 +216,7 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
               className="space-y-4 py-4"
             >
               <div className="space-y-2">
-                <label className="text-sm font-medium">Choose Your ENS Name</label>
+                <label className="text-sm font-medium font-mono text-white">Choose Your ENS Name</label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="yourname"
@@ -227,31 +227,31 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                       setPrice(null)
                     }}
                     disabled={isLoading || step === 'ens-waiting'}
-                    className="flex-1"
+                    className="flex-1 bg-black border-[#424242] text-white placeholder:text-white/40 font-mono"
                   />
-                  <span className="flex items-center text-muted-foreground">.eth</span>
+                  <span className="flex items-center text-white/60 font-mono">.eth</span>
                 </div>
               </div>
 
               {error && (
-                <div className="flex gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-destructive">{error}</p>
+                <div className="flex gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-400 font-mono">{error}</p>
                 </div>
               )}
 
               {isAvailable !== null && (
                 <div className={`p-4 rounded-lg border ${
                   isAvailable
-                    ? 'bg-green-500/10 border-green-500/20'
-                    : 'bg-destructive/10 border-destructive/20'
+                    ? 'bg-primary/10 border-primary/30'
+                    : 'bg-red-500/10 border-red-500/30'
                 }`}>
-                  <p className="text-sm font-medium mb-2">
+                  <p className="text-sm font-medium mb-2 font-mono text-white">
                     {isAvailable ? '✅ Domain is available!' : '❌ Domain is not available'}
                   </p>
                   {isAvailable && price !== null && (
-                    <p className="text-sm text-muted-foreground">
-                      Price: <span className="font-semibold">{formatEther(price)} ETH</span> per year
+                    <p className="text-sm text-white/60 font-mono">
+                      Price: <span className="font-semibold text-primary">{formatEther(price)} ETH</span> per year
                     </p>
                   )}
                 </div>
@@ -262,7 +262,7 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                   <Button
                     onClick={handleCheckAvailability}
                     disabled={!domainInput.trim() || isLoading}
-                    className="flex-1 bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90"
+                    className="flex-1 bg-primary text-black hover:bg-primary/90 font-bold font-mono"
                   >
                     {isLoading ? (
                       <>
@@ -283,7 +283,7 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                     }}
                     disabled={isLoading}
                     variant="outline"
-                    className="flex-1"
+                    className="flex-1 border-[#424242] text-white hover:bg-white/5 font-mono"
                   >
                     Check Different Domain
                   </Button>
@@ -292,7 +292,7 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                 {isAvailable && (
                   <>
                     {step === 'ens-waiting' && timeRemaining > 0 && (
-                      <Button disabled className="flex-1 bg-[#AFFF00] text-[#121212]">
+                      <Button disabled className="flex-1 bg-primary text-black font-mono font-bold">
                         <Clock className="w-4 h-4 mr-2" />
                         Wait {timeRemaining}s
                       </Button>
@@ -302,7 +302,7 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                       <Button
                         onClick={handleRegisterClick}
                         disabled={!canRegister}
-                        className="flex-1 bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90"
+                        className="flex-1 bg-primary text-black hover:bg-primary/90 font-bold font-mono"
                       >
                         {isLoading ? (
                           <>
@@ -331,11 +331,11 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
               exit={{ opacity: 0, scale: 0.9 }}
               className="flex flex-col items-center gap-4 py-8"
             >
-              <CheckCircle2 className="w-16 h-16 text-green-500" />
+              <CheckCircle2 className="w-16 h-16 text-primary" />
               <div className="text-center">
-                <h3 className="text-xl font-semibold mb-2">ENS Registered!</h3>
-                <p className="text-lg font-mono text-green-600 mb-2">{registeredName}</p>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="text-xl font-semibold mb-2 font-sentient text-white">ENS Registered!</h3>
+                <p className="text-lg font-mono text-primary mb-2">{registeredName}</p>
+                <p className="text-sm text-white/60 font-mono">
                   Moving to wallet mapping...
                 </p>
               </div>
@@ -352,54 +352,54 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
               className="space-y-4 py-4"
             >
               <div className="text-center mb-6">
-                <h3 className="text-lg font-semibold mb-2">Map Wallets</h3>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="text-lg font-semibold mb-2 font-sentient text-white">Map Wallets</h3>
+                <p className="text-sm text-white/60 font-mono">
                   Connect your ENS to your Sui wallet for cross-chain transactions
                 </p>
               </div>
 
               {/* Wallet Connection Status */}
               <div className="space-y-3">
-                <div className="p-4 border-2 rounded-lg bg-blue-50">
+                <div className="p-4 border-2 border-blue-500/30 rounded-lg bg-blue-500/10">
                   <div className="flex items-center gap-3">
-                    <Wallet className="w-5 h-5 text-blue-600" />
+                    <Wallet className="w-5 h-5 text-blue-400" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-[#121212]">Ethereum Wallet</p>
-                      <p className="text-xs text-muted-foreground font-mono truncate">
+                      <p className="text-sm font-medium text-white font-mono">Ethereum Wallet</p>
+                      <p className="text-xs text-white/60 font-mono truncate">
                         {ethAddress || 'Not connected'}
                       </p>
                     </div>
-                    {isEthConnected && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                    {isEthConnected && <CheckCircle2 className="w-5 h-5 text-primary" />}
                   </div>
                 </div>
 
                 <div className="flex justify-center">
-                  <ArrowRight className="w-5 h-5 text-muted-foreground" />
+                  <ArrowRight className="w-5 h-5 text-white/40" />
                 </div>
 
-                <div className="p-4 border-2 rounded-lg bg-purple-50">
+                <div className="p-4 border-2 border-purple-500/30 rounded-lg bg-purple-500/10">
                   <div className="flex items-center gap-3">
-                    <Wallet className="w-5 h-5 text-purple-600" />
+                    <Wallet className="w-5 h-5 text-purple-400" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-[#121212]">Sui Wallet</p>
-                      <p className="text-xs text-muted-foreground font-mono truncate">
+                      <p className="text-sm font-medium text-white font-mono">Sui Wallet</p>
+                      <p className="text-xs text-white/60 font-mono truncate">
                         {suiAddress || 'Not connected'}
                       </p>
                     </div>
-                    {isSuiConnected && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                    {isSuiConnected && <CheckCircle2 className="w-5 h-5 text-primary" />}
                   </div>
                 </div>
               </div>
 
               {error && (
-                <div className="flex gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-destructive">{error}</p>
+                <div className="flex gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-400 font-mono">{error}</p>
                 </div>
               )}
 
-              <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
-                <p className="text-xs text-muted-foreground">
+              <div className="bg-primary/10 border border-primary/30 p-3 rounded-lg">
+                <p className="text-xs text-white/70 font-mono">
                   💡 After mapping, transactions using your ENS name ({registeredName}) will be processed on
                   the Sui blockchain using your connected Sui wallet.
                 </p>
@@ -408,7 +408,7 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
               <Button
                 onClick={handleCreateWalletMapping}
                 disabled={!isEthConnected || !isSuiConnected || isLoading}
-                className="w-full bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90"
+                className="w-full bg-primary text-black hover:bg-primary/90 font-bold font-mono"
               >
                 {isLoading ? (
                   <>
@@ -434,35 +434,35 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
               exit={{ opacity: 0, scale: 0.9 }}
               className="flex flex-col items-center gap-4 py-8"
             >
-              <CheckCircle2 className="w-20 h-20 text-green-500" />
+              <CheckCircle2 className="w-20 h-20 text-primary" />
               <div className="text-center">
-                <h3 className="text-2xl font-bold mb-2">All Set!</h3>
-                <p className="text-lg font-mono text-green-600 mb-4">{registeredName}</p>
-                <p className="text-sm text-muted-foreground mb-6">
+                <h3 className="text-2xl font-bold mb-2 font-sentient text-white">All Set!</h3>
+                <p className="text-lg font-mono text-primary mb-4">{registeredName}</p>
+                <p className="text-sm text-white/60 mb-6 font-mono">
                   Your ENS is now mapped to your Sui wallet. All transactions using this ENS
                   will be processed on Sui!
                 </p>
               </div>
 
               {/* Mapping Summary */}
-              <div className="w-full space-y-2 bg-gray-50 p-4 rounded-lg border-2">
+              <div className="w-full space-y-2 bg-[#121212]/50 p-4 rounded-lg border-2 border-[#424242]">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">ENS Name:</span>
-                  <span className="font-mono font-semibold">{registeredName}</span>
+                  <span className="text-white/60 font-mono">ENS Name:</span>
+                  <span className="font-mono font-semibold text-white">{registeredName}</span>
                 </div>
                 <div className="flex items-center justify-center py-1">
-                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                  <ArrowRight className="w-4 h-4 text-white/40" />
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">ETH Address:</span>
-                  <span className="font-mono text-xs">{ethAddress?.slice(0, 6)}...{ethAddress?.slice(-4)}</span>
+                  <span className="text-white/60 font-mono">ETH Address:</span>
+                  <span className="font-mono text-xs text-white">{ethAddress?.slice(0, 6)}...{ethAddress?.slice(-4)}</span>
                 </div>
                 <div className="flex items-center justify-center py-1">
-                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                  <ArrowRight className="w-4 h-4 text-white/40" />
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Sui Address:</span>
-                  <span className="font-mono text-xs">{suiAddress?.slice(0, 6)}...{suiAddress?.slice(-4)}</span>
+                  <span className="text-white/60 font-mono">Sui Address:</span>
+                  <span className="font-mono text-xs text-white">{suiAddress?.slice(0, 6)}...{suiAddress?.slice(-4)}</span>
                 </div>
               </div>
 
@@ -473,7 +473,7 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                     href={getEnsExplorerUrl(registeredName)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block w-full p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 transition text-center text-sm"
+                    className="block w-full p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 transition text-center text-sm font-mono text-white"
                   >
                     View on ENS App →
                   </a>
@@ -481,14 +481,14 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                     href={getSepoliaExplorerUrl(registrationHash)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block w-full p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg hover:bg-purple-500/20 transition text-center text-sm"
+                    className="block w-full p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg hover:bg-purple-500/20 transition text-center text-sm font-mono text-white"
                   >
                     View Transaction →
                   </a>
                 </div>
               )}
 
-              <Button onClick={handleClose} className="w-full mt-4 bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90">
+              <Button onClick={handleClose} className="w-full mt-4 bg-primary text-black hover:bg-primary/90 font-bold font-mono">
                 Done
               </Button>
             </motion.div>
