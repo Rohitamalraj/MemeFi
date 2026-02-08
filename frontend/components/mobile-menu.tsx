@@ -5,6 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { WalletButton } from "./wallet-button";
 
 interface MobileMenuProps {
   className?: string;
@@ -71,13 +72,7 @@ export const MobileMenu = ({ className }: MobileMenuProps) => {
             ))}
 
             <div className="mt-6">
-              <Link
-                href="/#connect"
-                onClick={handleLinkClick}
-                className="inline-block text-xl font-mono uppercase text-primary transition-colors ease-out duration-150 hover:text-primary/80 py-2"
-              >
-                Connect
-              </Link>
+              <WalletButton />
             </div>
           </nav>
         </Dialog.Content>

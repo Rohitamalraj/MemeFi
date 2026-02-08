@@ -30,21 +30,36 @@ export function useWalletMapping() {
 
   /**
    * Load existing wallet mapping from localStorage
+   * CRITICAL: Only loads mapping if the currently connected Sui wallet matches the stored one
    */
   const loadMapping = useCallback(() => {
     try {
-      if (!ethAddress) return
+      if (!ethAddress) {
+        setCurrentMapping(null)
+        return
+      }
 
       const stored = localStorage.getItem(`wallet-mapping-${ethAddress.toLowerCase()}`)
       if (stored) {
         const mapping = JSON.parse(stored) as WalletMapping
-        setCurrentMapping(mapping)
-        console.log('✅ Loaded wallet mapping:', mapping)
+        
+        // CRITICAL: Verify the currently connected Sui wallet matches the mapping
+        if (suiAddress && mapping.suiAddress.toLowerCase() === suiAddress.toLowerCase()) {
+          setCurrentMapping(mapping)
+          console.log('✅ Loaded wallet mapping:', mapping)
+        } else {
+          // Sui wallet doesn't match - don't show the mapping
+          setCurrentMapping(null)
+          console.log('⚠️ Stored mapping exists but Sui wallet does not match')
+        }
+      } else {
+        setCurrentMapping(null)
       }
     } catch (err) {
       console.error('Error loading wallet mapping:', err)
+      setCurrentMapping(null)
     }
-  }, [ethAddress])
+  }, [ethAddress, suiAddress])
 
   /**
    * Create a new wallet mapping: ENS → ETH → Sui

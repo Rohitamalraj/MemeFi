@@ -2,7 +2,6 @@
 
 import { WagmiProvider, createConfig, http } from 'wagmi'
 import { sepolia, mainnet } from 'wagmi/chains'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { injected } from 'wagmi/connectors'
 import { ReactNode } from 'react'
 
@@ -18,30 +17,18 @@ const config = createConfig({
   },
 })
 
-// Create a client for React Query
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-})
-
 interface Web3ProviderProps {
   children: ReactNode
 }
 
 /**
- * Web3Provider wraps the app with Wagmi and React Query providers
- * This enables Ethereum wallet connections and ENS functionality
+ * Web3Provider wraps the app with Wagmi for Ethereum/ENS support
+ * QueryClient is provided by the parent Providers component
  */
 export function Web3Provider({ children }: Web3ProviderProps) {
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      {children}
     </WagmiProvider>
   )
 }

@@ -3,7 +3,6 @@ import type { Metadata, Viewport } from "next"
 import { JetBrains_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Providers } from "@/components/providers"
-import { Web3Provider } from "@/components/web3-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { Header } from "@/components/header"
 import "./globals.css"
@@ -34,13 +33,11 @@ export default function RootLayout({
         className={`${jetbrainsMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <Web3Provider>
-          <Providers>
-            <Header />
-            {children}
-            <Toaster />
-          </Providers>
-        </Web3Provider>
+        <Providers>
+          <Header />
+          {children}
+          <Toaster />
+        </Providers>
         <Analytics />
       </body>
     </html>

@@ -2,7 +2,7 @@
 
 import { createNetworkConfig, SuiClientProvider, WalletProvider } from '@mysten/dapp-kit';
 import { getFullnodeUrl } from '@mysten/sui.js/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import { ReactNode } from 'react';
 import { MEMEFI_CONFIG } from '@/lib/contract-config';
 
@@ -13,21 +13,17 @@ const { networkConfig } = createNetworkConfig({
   mainnet: { url: getFullnodeUrl('mainnet') },
 });
 
-// Create query client
-const queryClient = new QueryClient();
-
 interface SuiProviderProps {
   children: ReactNode;
+  queryClient: QueryClient;
 }
 
-export function SuiProvider({ children }: SuiProviderProps) {
+export function SuiProvider({ children, queryClient }: SuiProviderProps) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <SuiClientProvider networks={networkConfig} defaultNetwork={MEMEFI_CONFIG.network}>
-        <WalletProvider autoConnect>
-          {children}
-        </WalletProvider>
-      </SuiClientProvider>
-    </QueryClientProvider>
+    <SuiClientProvider networks={networkConfig} defaultNetwork={MEMEFI_CONFIG.network}>
+      <WalletProvider autoConnect queryClient={queryClient}>
+        {children}
+      </WalletProvider>
+    </SuiClientProvider>
   );
 }
