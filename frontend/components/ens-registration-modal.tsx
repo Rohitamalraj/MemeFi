@@ -1,0 +1,500 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useEnsRegistration } from '@/hooks/use-ens-registration'
+import { useWalletMapping } from '@/hooks/use-wallet-mapping'
+import { useAccount } from 'wagmi'
+import { useWalletConnection } from '@/lib/use-wallet'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Loader2, CheckCircle2, AlertCircle, Clock, ArrowRight, Link2, Wallet } from 'lucide-react'
+import { formatEther } from 'viem'
+
+interface ENSRegistrationModalProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+type RegistrationStep = 'ens-register' | 'ens-waiting' | 'ens-complete' | 'wallet-mapping' | 'complete'
+
+export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalProps) {
+  const [domainInput, setDomainInput] = useState('')
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
+  const [price, setPrice] = useState<bigint | null>(null)
+  const [timeRemaining, setTimeRemaining] = useState(0)
+  const [step, setStep] = useState<RegistrationStep>('ens-register')
+
+  // Wagmi hooks for Ethereum wallet
+  const { address: ethAddress, isConnected: isEthConnected } = useAccount()
+  
+  // Sui wallet hook
+  const { address: suiAddress, isConnected: isSuiConnected } = useWalletConnection()
+
+  const {
+    isLoading: ensLoading,
+    error: ensError,
+    registeredName,
+    registrationHash,
+    currentStep: ensStep,
+    getTimeRemaining,
+    checkAvailability,
+    getPrice,
+    submitCommitment,
+    registerDomain,
+    getEnsExplorerUrl,
+    getSepoliaExplorerUrl,
+  } = useEnsRegistration()
+
+  const {
+    isLoading: mappingLoading,
+    error: mappingError,
+    createMapping,
+  } = useWalletMapping()
+
+  const isLoading = ensLoading || mappingLoading
+  const error = ensError || mappingError
+
+  // Update time remaining every second
+  useEffect(() => {
+    if (ensStep === 'waiting') {
+      const interval = setInterval(() => {
+        setTimeRemaining(getTimeRemaining())
+      }, 1000)
+      return () => clearInterval(interval)
+    }
+  }, [ensStep, getTimeRemaining])
+
+  // When ENS registration completes, move to wallet mapping step
+  useEffect(() => {
+    if (registeredName && step === 'ens-complete') {
+      // Auto-advance to wallet mapping after a short delay
+      const timer = setTimeout(() => {
+        setStep('wallet-mapping')
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [registeredName, step])
+
+  const handleCheckAvailability = async () => {
+    if (!domainInput.trim()) return
+
+    const available = await checkAvailability(domainInput)
+    setIsAvailable(available)
+
+    if (available) {
+      const priceData = await getPrice(domainInput)
+      setPrice(priceData)
+    }
+  }
+
+  const handleRegisterClick = async () => {
+    if (ensStep === 'idle') {
+      // Step 1: Submit commitment
+      const success = await submitCommitment(domainInput)
+      if (success) {
+        setTimeRemaining(60)
+        setStep('ens-waiting')
+      }
+    } else if (ensStep === 'waiting' && timeRemaining <= 0) {
+      // Step 2: Register domain
+      const success = await registerDomain(domainInput)
+      if (success) {
+        setStep('ens-complete')
+      }
+    }
+  }
+
+  const handleCreateWalletMapping = async () => {
+    if (!registeredName) return
+
+    const success = await createMapping(registeredName)
+    if (success) {
+      setStep('complete')
+    }
+  }
+
+  const handleClose = () => {
+    // Reset all state
+    setDomainInput('')
+    setIsAvailable(null)
+    setPrice(null)
+    setStep('ens-register')
+    onClose()
+  }
+
+  const canRegister = isAvailable && !isLoading && (ensStep === 'idle' || (ensStep === 'waiting' && timeRemaining <= 0))
+
+  // Prevent modal from closing during registration process
+  const handleOpenChange = (open: boolean) => {
+    if (!open && step === 'ens-register' && !isLoading) {
+      handleClose()
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[550px]" onInteractOutside={(e) => {
+        if (step !== 'ens-register' || isLoading) {
+          e.preventDefault()
+        }
+      }}>
+        <DialogHeader>
+          <DialogTitle className="text-2xl">
+            {step === 'complete' ? '🎉 Setup Complete!' : 'Cross-Chain ENS Setup'}
+          </DialogTitle>
+          <DialogDescription>
+            {step === 'complete' 
+              ? 'Your ENS is now mapped to your Sui wallet'
+              : 'Register ENS and map it to your Sui wallet for cross-chain transactions'}
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Progress Indicator */}
+        <div className="flex items-center justify-between mb-4 px-2">
+          <div className="flex flex-col items-center">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              ['ens-register', 'ens-waiting', 'ens-complete', 'wallet-mapping', 'complete'].includes(step)
+                ? 'bg-[#AFFF00] text-[#121212]'
+                : 'bg-gray-200 text-gray-400'
+            }`}>
+              {['ens-complete', 'wallet-mapping', 'complete'].includes(step) ? <CheckCircle2 className="w-5 h-5" /> : '1'}
+            </div>
+            <span className="text-xs mt-1">ENS</span>
+          </div>
+          
+          <div className="flex-1 h-0.5 bg-gray-200 mx-2">
+            <div className={`h-full transition-all ${
+              ['wallet-mapping', 'complete'].includes(step) ? 'bg-[#AFFF00] w-full' : 'bg-gray-200 w-0'
+            }`} />
+          </div>
+
+          <div className="flex flex-col items-center">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              ['wallet-mapping', 'complete'].includes(step)
+                ? 'bg-[#AFFF00] text-[#121212]'
+                : 'bg-gray-200 text-gray-400'
+            }`}>
+              {step === 'complete' ? <CheckCircle2 className="w-5 h-5" /> : '2'}
+            </div>
+            <span className="text-xs mt-1">Map</span>
+          </div>
+
+          <div className="flex-1 h-0.5 bg-gray-200 mx-2">
+            <div className={`h-full transition-all ${
+              step === 'complete' ? 'bg-[#AFFF00] w-full' : 'bg-gray-200 w-0'
+            }`} />
+          </div>
+
+          <div className="flex flex-col items-center">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              step === 'complete'
+                ? 'bg-[#AFFF00] text-[#121212]'
+                : 'bg-gray-200 text-gray-400'
+            }`}>
+              {step === 'complete' ? <CheckCircle2 className="w-5 h-5" /> : '3'}
+            </div>
+            <span className="text-xs mt-1">Done</span>
+          </div>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {/* Step 1: ENS Registration */}
+          {(step === 'ens-register' || step === 'ens-waiting') && (
+            <motion.div
+              key="ens-register"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-4 py-4"
+            >
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Choose Your ENS Name</label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="yourname"
+                    value={domainInput}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      setDomainInput(e.target.value)
+                      setIsAvailable(null)
+                      setPrice(null)
+                    }}
+                    disabled={isLoading || step === 'ens-waiting'}
+                    className="flex-1"
+                  />
+                  <span className="flex items-center text-muted-foreground">.eth</span>
+                </div>
+              </div>
+
+              {error && (
+                <div className="flex gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-destructive">{error}</p>
+                </div>
+              )}
+
+              {isAvailable !== null && (
+                <div className={`p-4 rounded-lg border ${
+                  isAvailable
+                    ? 'bg-green-500/10 border-green-500/20'
+                    : 'bg-destructive/10 border-destructive/20'
+                }`}>
+                  <p className="text-sm font-medium mb-2">
+                    {isAvailable ? '✅ Domain is available!' : '❌ Domain is not available'}
+                  </p>
+                  {isAvailable && price !== null && (
+                    <p className="text-sm text-muted-foreground">
+                      Price: <span className="font-semibold">{formatEther(price)} ETH</span> per year
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-4">
+                {step === 'ens-register' && isAvailable === null && (
+                  <Button
+                    onClick={handleCheckAvailability}
+                    disabled={!domainInput.trim() || isLoading}
+                    className="flex-1 bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Checking...
+                      </>
+                    ) : (
+                      'Check Availability'
+                    )}
+                  </Button>
+                )}
+
+                {isAvailable !== null && step === 'ens-register' && (
+                  <Button
+                    onClick={() => {
+                      setIsAvailable(null)
+                      setPrice(null)
+                    }}
+                    disabled={isLoading}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Check Different Domain
+                  </Button>
+                )}
+
+                {isAvailable && (
+                  <>
+                    {step === 'ens-waiting' && timeRemaining > 0 && (
+                      <Button disabled className="flex-1 bg-[#AFFF00] text-[#121212]">
+                        <Clock className="w-4 h-4 mr-2" />
+                        Wait {timeRemaining}s
+                      </Button>
+                    )}
+
+                    {(step === 'ens-register' || (step === 'ens-waiting' && timeRemaining <= 0)) && (
+                      <Button
+                        onClick={handleRegisterClick}
+                        disabled={!canRegister}
+                        className="flex-1 bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            {step === 'ens-register' ? 'Starting...' : 'Registering...'}
+                          </>
+                        ) : step === 'ens-register' ? (
+                          'Start Registration'
+                        ) : (
+                          'Complete Registration'
+                        )}
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 2: ENS Registration Complete */}
+          {step === 'ens-complete' && registeredName && (
+            <motion.div
+              key="ens-complete"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="flex flex-col items-center gap-4 py-8"
+            >
+              <CheckCircle2 className="w-16 h-16 text-green-500" />
+              <div className="text-center">
+                <h3 className="text-xl font-semibold mb-2">ENS Registered!</h3>
+                <p className="text-lg font-mono text-green-600 mb-2">{registeredName}</p>
+                <p className="text-sm text-muted-foreground">
+                  Moving to wallet mapping...
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 3: Wallet Mapping */}
+          {step === 'wallet-mapping' && (
+            <motion.div
+              key="wallet-mapping"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-4 py-4"
+            >
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-semibold mb-2">Map Wallets</h3>
+                <p className="text-sm text-muted-foreground">
+                  Connect your ENS to your Sui wallet for cross-chain transactions
+                </p>
+              </div>
+
+              {/* Wallet Connection Status */}
+              <div className="space-y-3">
+                <div className="p-4 border-2 rounded-lg bg-blue-50">
+                  <div className="flex items-center gap-3">
+                    <Wallet className="w-5 h-5 text-blue-600" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#121212]">Ethereum Wallet</p>
+                      <p className="text-xs text-muted-foreground font-mono truncate">
+                        {ethAddress || 'Not connected'}
+                      </p>
+                    </div>
+                    {isEthConnected && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                  </div>
+                </div>
+
+                <div className="flex justify-center">
+                  <ArrowRight className="w-5 h-5 text-muted-foreground" />
+                </div>
+
+                <div className="p-4 border-2 rounded-lg bg-purple-50">
+                  <div className="flex items-center gap-3">
+                    <Wallet className="w-5 h-5 text-purple-600" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#121212]">Sui Wallet</p>
+                      <p className="text-xs text-muted-foreground font-mono truncate">
+                        {suiAddress || 'Not connected'}
+                      </p>
+                    </div>
+                    {isSuiConnected && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="flex gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-destructive">{error}</p>
+                </div>
+              )}
+
+              <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  💡 After mapping, transactions using your ENS name ({registeredName}) will be processed on
+                  the Sui blockchain using your connected Sui wallet.
+                </p>
+              </div>
+
+              <Button
+                onClick={handleCreateWalletMapping}
+                disabled={!isEthConnected || !isSuiConnected || isLoading}
+                className="w-full bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating Mapping...
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="w-4 h-4 mr-2" />
+                    Map Wallets
+                  </>
+                )}
+              </Button>
+            </motion.div>
+          )}
+
+          {/* Step 4: Complete */}
+          {step === 'complete' && (
+            <motion.div
+              key="complete"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="flex flex-col items-center gap-4 py-8"
+            >
+              <CheckCircle2 className="w-20 h-20 text-green-500" />
+              <div className="text-center">
+                <h3 className="text-2xl font-bold mb-2">All Set!</h3>
+                <p className="text-lg font-mono text-green-600 mb-4">{registeredName}</p>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Your ENS is now mapped to your Sui wallet. All transactions using this ENS
+                  will be processed on Sui!
+                </p>
+              </div>
+
+              {/* Mapping Summary */}
+              <div className="w-full space-y-2 bg-gray-50 p-4 rounded-lg border-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">ENS Name:</span>
+                  <span className="font-mono font-semibold">{registeredName}</span>
+                </div>
+                <div className="flex items-center justify-center py-1">
+                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">ETH Address:</span>
+                  <span className="font-mono text-xs">{ethAddress?.slice(0, 6)}...{ethAddress?.slice(-4)}</span>
+                </div>
+                <div className="flex items-center justify-center py-1">
+                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Sui Address:</span>
+                  <span className="font-mono text-xs">{suiAddress?.slice(0, 6)}...{suiAddress?.slice(-4)}</span>
+                </div>
+              </div>
+
+              {/* Links */}
+              {registeredName && registrationHash && (
+                <div className="w-full space-y-2">
+                  <a
+                    href={getEnsExplorerUrl(registeredName)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 transition text-center text-sm"
+                  >
+                    View on ENS App →
+                  </a>
+                  <a
+                    href={getSepoliaExplorerUrl(registrationHash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg hover:bg-purple-500/20 transition text-center text-sm"
+                  >
+                    View Transaction →
+                  </a>
+                </div>
+              )}
+
+              <Button onClick={handleClose} className="w-full mt-4 bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90">
+                Done
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </DialogContent>
+    </Dialog>
+  )
+}

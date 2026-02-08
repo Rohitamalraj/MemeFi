@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Wallet, TrendingUp, Clock, ExternalLink, Activity, DollarSign } from "lucide-react"
+import { Wallet, TrendingUp, Clock, ExternalLink, Activity, DollarSign, Globe } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useWalletConnection } from "@/lib/use-wallet"
 import { getSuiClient, getTokenById } from "@/lib/sui-client"
 import { MEMEFI_CONFIG } from "@/lib/contract-config"
+import { useWalletMapping } from "@/hooks/use-wallet-mapping"
+import { ENSRegistrationModal } from "@/components/ens-registration-modal"
 
 interface TokenHolding {
   tokenId: string
@@ -53,6 +55,8 @@ export function PortfolioPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [totalValue, setTotalValue] = useState(0)
+  const [isEnsModalOpen, setIsEnsModalOpen] = useState(false)
+  const { currentMapping, isMapped } = useWalletMapping()
 
   useEffect(() => {
     if (!address) {
@@ -195,6 +199,78 @@ export function PortfolioPage() {
           <p className="text-xl text-[#121212]/70">
             Track your holdings and transaction history
           </p>
+        </motion.div>
+
+        {/* ENS Registration Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mb-8"
+        >
+          <Card className={`border-2 ${isMapped ? 'border-[#4DA2FF] bg-gradient-to-br from-[#4DA2FF]/10 to-white' : 'border-[#AFFF00] bg-gradient-to-br from-[#AFFF00]/10 to-white'}`}>
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Globe className={`w-6 h-6 ${isMapped ? 'text-[#4DA2FF]' : 'text-[#7AB800]'}`} />
+                    <h3 className="text-lg font-bold text-[#121212]">
+                      {isMapped ? 'ENS Cross-Chain Setup' : 'Register ENS Name'}
+                    </h3>
+                  </div>
+                  
+                  {isMapped && currentMapping ? (
+                    <>
+                      <p className="text-sm text-[#121212]/70 mb-4">
+                        Your ENS is mapped to your Sui wallet for cross-chain transactions
+                      </p>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[#121212]/60">Your Identity:</span>
+                          <span className="font-mono font-semibold text-[#4DA2FF]">{currentMapping.ensName}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[#121212]/60">Mapped Sui Address:</span>
+                          <span className="font-mono text-xs">{currentMapping.suiAddress.slice(0, 10)}...{currentMapping.suiAddress.slice(-8)}</span>
+                        </div>
+                      </div>
+                      <div className="bg-[#4DA2FF]/10 border border-[#4DA2FF]/30 p-3 rounded-lg">
+                        <p className="text-xs text-[#121212]/70">
+                          ✅ Your ENS name is now your identity across the app - it will be displayed everywhere instead of wallet addresses!
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-[#121212]/70 mb-4">
+                        Register an ENS name and map it to your Sui wallet for a unified cross-chain identity
+                      </p>
+                      <div className="flex gap-2 mb-4">
+                        <div className="flex items-center gap-2 text-xs text-[#121212]/60">
+                          <div className="w-6 h-6 rounded-full bg-[#AFFF00] text-[#121212] flex items-center justify-center font-bold">1</div>
+                          <span>Register ENS</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-[#121212]/60">
+                          <div className="w-6 h-6 rounded-full bg-[#AFFF00] text-[#121212] flex items-center justify-center font-bold">2</div>
+                          <span>Map Wallets</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-[#121212]/60">
+                          <div className="w-6 h-6 rounded-full bg-[#AFFF00] text-[#121212] flex items-center justify-center font-bold">3</div>
+                          <span>Done!</span>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => setIsEnsModalOpen(true)}
+                        className="bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold"
+                      >
+                        Get Started
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
 
         {/* Total Value Card */}
@@ -344,6 +420,12 @@ export function PortfolioPage() {
           )}
         </motion.div>
       </div>
+
+      {/* ENS Registration Modal */}
+      <ENSRegistrationModal 
+        isOpen={isEnsModalOpen} 
+        onClose={() => setIsEnsModalOpen(false)} 
+      />
     </div>
   )
 }
