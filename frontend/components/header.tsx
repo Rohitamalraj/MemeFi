@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "./logo";
 import { MobileMenu } from "./mobile-menu";
+import { WalletButton } from "./wallet-button";
 
 export const Header = () => {
   return (
@@ -20,9 +21,9 @@ export const Header = () => {
             </Link>
           ))}
         </nav>
-        <Link className="uppercase max-lg:hidden transition-colors ease-out duration-150 font-mono text-primary hover:text-primary/80" href="/#connect">
-          Connect
-        </Link>
+        <div className="max-lg:hidden">
+          <WalletButton />
+        </div>
         <MobileMenu />
       </header>
     </div>
