@@ -13,7 +13,6 @@ export function Hero() {
       <GL hovering={hovering} />
 
       <div className="pb-16 mt-auto text-center relative">
-        <Pill className="mb-6">NOT A PUMP.FUN CLONE</Pill>
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-sentient">
           Fair Launch <br />
           <i className="font-light">DeFi Primitive</i>
