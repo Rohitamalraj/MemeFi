@@ -349,7 +349,7 @@ export default function TokenTradingPage() {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#AFFF00] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-16 h-16 border-4 border-[#FFC700] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-400">Loading token...</p>
         </div>
       </div>
@@ -362,7 +362,7 @@ export default function TokenTradingPage() {
         <div className="text-center">
           <p className="text-xl text-gray-400">Token not found</p>
           <Link href="/tokens">
-            <Button className="mt-4 bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90">
+            <Button className="mt-4 bg-[#FFC700] text-[#121212] hover:bg-[#FFC700]/90">
               Back to Tokens
             </Button>
           </Link>
@@ -384,7 +384,7 @@ export default function TokenTradingPage() {
           <Link href="/tokens">
             <Button 
               variant="outline" 
-              className="border-2 border-[#AFFF00] bg-[#0a0a0a] text-[#AFFF00] hover:bg-[#AFFF00] hover:text-[#121212] font-bold transition-all duration-200 shadow-lg shadow-[#AFFF00]/20"
+              className="border-2 border-[#FFC700] bg-[#0a0a0a] text-[#FFC700] hover:bg-[#FFC700] hover:text-[#121212] font-bold transition-all duration-200 shadow-lg shadow-[#FFC700]/20"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Tokens
@@ -401,7 +401,7 @@ export default function TokenTradingPage() {
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-4">
               {token.imageUrl ? (
-                <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-[#AFFF00]/30">
+                <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-[#FFC700]/30">
                   <img 
                     src={token.imageUrl} 
                     alt={token.name}
@@ -413,12 +413,12 @@ export default function TokenTradingPage() {
                       if (fallback) fallback.classList.remove('hidden');
                     }}
                   />
-                  <div className="hidden w-20 h-20 bg-gradient-to-br from-[#AFFF00] to-[#7AB800] rounded-2xl flex items-center justify-center font-black text-3xl text-[#121212]">
+                  <div className="hidden w-20 h-20 bg-gradient-to-br from-[#FFC700] to-[#E5B000] rounded-2xl flex items-center justify-center font-black text-3xl text-[#121212]">
                     {token.symbol.slice(0, 2)}
                   </div>
                 </div>
               ) : (
-                <div className="w-20 h-20 bg-gradient-to-br from-[#AFFF00] to-[#7AB800] rounded-2xl flex items-center justify-center font-black text-3xl text-[#121212]">
+                <div className="w-20 h-20 bg-gradient-to-br from-[#FFC700] to-[#E5B000] rounded-2xl flex items-center justify-center font-black text-3xl text-[#121212]">
                   {token.symbol.slice(0, 2)}
                 </div>
               )}
@@ -432,7 +432,7 @@ export default function TokenTradingPage() {
             
             <div className="text-right">
               <div className="text-sm text-gray-400 mb-1">Current Phase</div>
-              <div className="inline-flex items-center gap-2 bg-[#AFFF00] px-4 py-2 rounded-full">
+              <div className="inline-flex items-center gap-2 bg-[#FFC700] px-4 py-2 rounded-full">
                 <Activity className="w-4 h-4" />
                 <span className="font-bold text-[#121212]">{PHASE_LABELS[currentPhase]}</span>
               </div>
@@ -450,17 +450,17 @@ export default function TokenTradingPage() {
           {/* Left Column - Stats */}
           <div className="lg:col-span-1 space-y-4">
             {/* Market Stats Card */}
-            <Card className="border-2 border-gray-800 bg-gradient-to-br from-[#AFFF00]/5 to-[#0f0f0f]">
+            <Card className="border-2 border-gray-800 bg-gradient-to-br from-[#FFC700]/5 to-[#0f0f0f]">
               <CardContent className="pt-6">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-white">
-                  <TrendingUp className="w-5 h-5 text-[#AFFF00]" />
+                  <TrendingUp className="w-5 h-5 text-[#FFC700]" />
                   Market Stats
                 </h3>
                 
                 <div className="space-y-4">
                   <div>
                     <div className="text-sm text-gray-400 mb-1">Market Cap</div>
-                    <div className="font-black text-2xl text-[#AFFF00]">
+                    <div className="font-black text-2xl text-[#FFC700]">
                       {token.marketCapUsd ? formatUSD(token.marketCapUsd) : `${formatNumber(token.marketCap)} SUI`}
                     </div>
                     {token.marketCapChange24h !== undefined && token.marketCapChangePercent24h !== undefined && (
@@ -520,7 +520,7 @@ export default function TokenTradingPage() {
                   <div>
                     <div className="text-sm text-gray-400 mb-1">Circulating Supply</div>
                     <div className="font-bold text-xl text-white">{formatNumber(token.circulatingSupply)}</div>
-                    <div className="text-xs text-[#AFFF00] mt-1">{supplyPercent}% of total</div>
+                    <div className="text-xs text-[#FFC700] mt-1">{supplyPercent}% of total</div>
                   </div>
 
                   <div>
@@ -542,7 +542,7 @@ export default function TokenTradingPage() {
                 {address && (
                   <div className="mt-6 pt-6 border-t border-gray-800">
                     <div className="text-sm text-gray-400 mb-1">Your Balance</div>
-                    <div className="font-bold text-2xl text-[#AFFF00]">
+                    <div className="font-bold text-2xl text-[#FFC700]">
                       {formatNumber(userBalance)} {token.symbol}
                     </div>
                   </div>
@@ -551,7 +551,7 @@ export default function TokenTradingPage() {
             </Card>
 
             {/* Phase Info */}
-            <Card className="border-2 border-gray-800 bg-gradient-to-br from-[#AFFF00]/5 to-[#0f0f0f]">
+            <Card className="border-2 border-gray-800 bg-gradient-to-br from-[#FFC700]/5 to-[#0f0f0f]">
               <CardContent className="pt-6">
                 <h3 className="font-bold text-lg mb-3 text-white">Phase Information</h3>
                 <div className="space-y-3 text-sm">
@@ -564,7 +564,7 @@ export default function TokenTradingPage() {
                     >
                       <div
                         className={`w-2 h-2 rounded-full ${
-                          idx === currentPhase ? 'bg-[#AFFF00] animate-pulse' : 'bg-gray-700'
+                          idx === currentPhase ? 'bg-[#FFC700] animate-pulse' : 'bg-gray-700'
                         }`}
                       />
                       {phase}
@@ -592,7 +592,7 @@ export default function TokenTradingPage() {
                     {holders.map((holder, index) => (
                       <div
                         key={holder.address}
-                        className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg border border-gray-800 hover:border-[#AFFF00]/20 transition-colors"
+                        className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg border border-gray-800 hover:border-[#FFC700]/20 transition-colors"
                       >
                         <div className="flex items-center gap-3">
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -613,7 +613,7 @@ export default function TokenTradingPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-bold text-[#AFFF00]">
+                          <div className="font-bold text-[#FFC700]">
                             {holder.percentage.toFixed(2)}%
                           </div>
                         </div>
@@ -691,7 +691,7 @@ export default function TokenTradingPage() {
                       onClick={() => setTradeType('buy')}
                       className={`flex-1 font-bold ${
                         tradeType === 'buy'
-                          ? 'bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90'
+                          ? 'bg-[#FFC700] text-[#121212] hover:bg-[#FFC700]/90'
                           : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
                       }`}
                     >
@@ -721,7 +721,7 @@ export default function TokenTradingPage() {
                       value={suiAmount}
                       onChange={(e) => setSuiAmount(e.target.value)}
                       placeholder="0.0"
-                      className="w-full px-4 py-3 border-2 border-gray-700 bg-[#1a1a1a] text-white rounded-lg focus:border-[#AFFF00] focus:outline-none text-lg font-bold"
+                      className="w-full px-4 py-3 border-2 border-gray-700 bg-[#1a1a1a] text-white rounded-lg focus:border-[#FFC700] focus:outline-none text-lg font-bold"
                       step="0.001"
                       min="0"
                     />
@@ -748,13 +748,13 @@ export default function TokenTradingPage() {
 
                   {/* Token Amount Preview */}
                   {suiAmount && parseFloat(suiAmount) > 0 && (
-                    <div className="bg-gradient-to-r from-[#AFFF00]/10 to-[#AFFF00]/5 rounded-lg p-4 mb-4 border border-[#AFFF00]/20">
+                    <div className="bg-gradient-to-r from-[#FFC700]/10 to-[#FFC700]/5 rounded-lg p-4 mb-4 border border-[#FFC700]/20">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-400">
                           {tradeType === 'buy' ? 'You will receive' : 'You will send'}
                         </span>
                         <div className="text-right">
-                          <div className="text-xl font-black text-[#AFFF00]">
+                          <div className="text-xl font-black text-[#FFC700]">
                             {formatNumber(parseFloat(suiAmount) / token.currentPrice)} {token.symbol}
                           </div>
                           <div className="text-xs text-gray-400">
@@ -771,7 +771,7 @@ export default function TokenTradingPage() {
                   <Button
                     onClick={handleTrade}
                     disabled={!address || !suiAmount || parseFloat(suiAmount) <= 0 || isTrading || currentPhase === 0}
-                    className="w-full bg-[#AFFF00] text-[#121212] hover:bg-[#AFFF00]/90 font-bold text-lg py-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-[#FFC700] text-[#121212] hover:bg-[#FFC700]/90 font-bold text-lg py-6 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {!address
                       ? 'Connect Wallet'
@@ -786,15 +786,15 @@ export default function TokenTradingPage() {
 
                   {/* Block Explorer Link */}
                   {lastTxDigest && (
-                    <div className="mt-4 p-4 bg-[#AFFF00]/10 border-2 border-[#AFFF00]/30 rounded-lg">
+                    <div className="mt-4 p-4 bg-[#FFC700]/10 border-2 border-[#FFC700]/30 rounded-lg">
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0">
-                          <svg className="w-5 h-5 text-[#AFFF00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 text-[#FFC700]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </div>
                         <div className="flex-1">
-                          <div className="font-bold text-[#AFFF00] mb-1">Transaction Successful!</div>
+                          <div className="font-bold text-[#FFC700] mb-1">Transaction Successful!</div>
                           <p className="text-sm text-gray-300 mb-2">
                             View your transaction on the block explorer:
                           </p>
@@ -802,7 +802,7 @@ export default function TokenTradingPage() {
                             href={`https://suiscan.xyz/testnet/tx/${lastTxDigest}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 text-sm text-[#AFFF00] hover:text-[#AFFF00]/80 underline break-all"
+                            className="inline-flex items-center gap-2 text-sm text-[#FFC700] hover:text-[#FFC700]/80 underline break-all"
                           >
                             <span className="font-mono">{lastTxDigest.slice(0, 20)}...{lastTxDigest.slice(-20)}</span>
                             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

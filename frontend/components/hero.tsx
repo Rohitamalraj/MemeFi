@@ -18,8 +18,7 @@ export function Hero() {
           <i className="font-light">DeFi Primitive</i>
         </h1>
         <p className="font-mono text-sm sm:text-base text-foreground/60 text-balance mt-8 max-w-[440px] mx-auto">
-          Sui-native protocol with <span className="text-primary">rule-enforced fairness</span> and{" "}
-          <span className="text-primary">privacy-aware</span> early trading sessions
+          A Sui-native memecoin launch and trading protocol that enforces fair launches at the protocol level and protects users with privacy-aware early trading sessions
         </p>
 
         <Link className="contents max-sm:hidden" href="/launch">
