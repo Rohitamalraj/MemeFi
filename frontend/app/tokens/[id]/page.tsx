@@ -378,14 +378,19 @@ export default function TokenTradingPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
-      <div className="container mx-auto px-4 py-8">
-        {/* Back Button */}
-        <Link href="/tokens">
-          <Button variant="outline" className="mb-6 border-2 border-gray-700 bg-[#1a1a1a] text-white hover:bg-[#2a2a2a]">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Tokens
-          </Button>
-        </Link>
+      <div className="container mx-auto px-4 pt-32 md:pt-36 pb-8">
+        {/* Back Button - Sticky with enhanced visibility */}
+        <div className="sticky top-20 md:top-24 z-40 -mx-4 px-4 py-4 mb-6 bg-gradient-to-r from-[#0a0a0a] via-[#0a0a0a] to-transparent">
+          <Link href="/tokens">
+            <Button 
+              variant="outline" 
+              className="border-2 border-[#AFFF00] bg-[#0a0a0a] text-[#AFFF00] hover:bg-[#AFFF00] hover:text-[#121212] font-bold transition-all duration-200 shadow-lg shadow-[#AFFF00]/20"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Tokens
+            </Button>
+          </Link>
+        </div>
 
         {/* Token Header */}
         <motion.div

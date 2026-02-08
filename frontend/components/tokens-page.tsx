@@ -136,23 +136,7 @@ function TokenCard({ token }: { token: Token }) {
                 </div>
               </div>
               <div className="flex flex-col items-end gap-2">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`px-3 py-1 text-xs font-bold font-mono uppercase ${
-                      token.phase === "early"
-                        ? "bg-primary/20 text-primary border border-primary/50"
-                        : "bg-white/5 text-white/60 border border-white/20"
-                    }`}
-                    style={{
-                      clipPath: 'polygon(6px 0, calc(100% - 6px) 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 calc(100% - 6px), 0 6px)',
-                    }}
-                  >
-                    {token.phase === "early" ? "EARLY" : "PUBLIC"}
-                  </div>
-                  <div className="text-xs text-white/40 font-mono">
-                    Phase {token.phaseNumber}
-                  </div>
-                </div>
+                
                 {token.hasActiveSessions && (
                   <div className="flex items-center gap-1 text-xs text-primary font-mono">
                     <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
@@ -240,7 +224,7 @@ export function TokensPage() {
     })
 
   return (
-    <div className="min-h-screen bg-background pt-24 pb-20">
+    <div className="min-h-screen bg-background pt-32 md:pt-40 pb-20">
       <div className="max-w-7xl mx-auto px-6">
         {/* Header */}
         <motion.div
@@ -291,23 +275,6 @@ export function TokensPage() {
                   className="font-bold capitalize font-mono"
                 >
                   {sort}
-                </Button>
-              ))}
-            </div>
-            <div className="h-6 w-px bg-[#424242]" />
-            <div className="flex gap-2">
-              <span className="text-sm font-bold text-white/60 flex items-center font-mono uppercase">Phase:</span>
-              {(["all", "early", "public", "open"] as const).map((phase) => (
-                <Button
-                  key={phase}
-                  onClick={() => setFilterPhase(phase)}
-                  variant={filterPhase === phase ? "default" : "outline"}
-                  size="sm"
-                  className="font-bold capitalize font-mono"
-                >
-                  {phase === "early" && <Shield className="w-3 h-3 mr-1" />}
-                  {phase === "public" && <Eye className="w-3 h-3 mr-1" />}
-                  {phase}
                 </Button>
               ))}
             </div>
