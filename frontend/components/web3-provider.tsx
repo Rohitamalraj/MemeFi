@@ -3,15 +3,14 @@
 import { WagmiProvider, createConfig, http } from 'wagmi'
 import { sepolia, mainnet } from 'wagmi/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { injected, metaMask } from 'wagmi/connectors'
+import { injected } from 'wagmi/connectors'
 import { ReactNode } from 'react'
 
 // Configure Wagmi for Ethereum/ENS support
 const config = createConfig({
   chains: [sepolia, mainnet],
   connectors: [
-    injected({ target: 'metaMask' }),
-    metaMask(),
+    injected(),
   ],
   transports: {
     [sepolia.id]: http(),
