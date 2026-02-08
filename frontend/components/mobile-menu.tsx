@@ -18,7 +18,6 @@ export const MobileMenu = ({ className }: MobileMenuProps) => {
     { name: "Tokens", href: "/tokens" },
     { name: "Launch", href: "/launch" },
     { name: "Portfolio", href: "/portfolio" },
-    { name: "Sessions", href: "/sessions" },
   ];
 
   const handleLinkClick = () => {
