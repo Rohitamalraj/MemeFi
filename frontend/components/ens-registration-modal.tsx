@@ -132,17 +132,17 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
 
   const canRegister = isAvailable && !isLoading && (ensStep === 'idle' || (ensStep === 'waiting' && timeRemaining <= 0))
 
-  // Prevent modal from closing during registration process
+  // Allow modal closing unless actively loading
   const handleOpenChange = (open: boolean) => {
-    if (!open && step === 'ens-register' && !isLoading) {
+    if (!open && !isLoading) {
       handleClose()
     }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[550px] bg-black border-[#424242] text-white" onInteractOutside={(e) => {
-        if (step !== 'ens-register' || isLoading) {
+      <DialogContent className="w-[95vw] max-w-[450px] sm:max-w-[550px] bg-black border-[#424242] text-white" onInteractOutside={(e) => {
+        if (isLoading) {
           e.preventDefault()
         }
       }}>
@@ -360,16 +360,16 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
 
               {/* Wallet Connection Status */}
               <div className="space-y-3">
-                <div className="p-4 border-2 border-blue-500/30 rounded-lg bg-blue-500/10">
-                  <div className="flex items-center gap-3">
-                    <Wallet className="w-5 h-5 text-blue-400" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-white font-mono">Ethereum Wallet</p>
-                      <p className="text-xs text-white/60 font-mono truncate">
+                <div className="p-3 sm:p-4 border-2 border-[#424242] rounded-lg bg-[#121212]/50 overflow-hidden">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <p className="text-xs sm:text-sm font-medium text-white font-mono">Ethereum Wallet</p>
+                      <div className="text-xs text-white/60 font-mono break-all leading-tight">
                         {ethAddress || 'Not connected'}
-                      </p>
+                      </div>
                     </div>
-                    {isEthConnected && <CheckCircle2 className="w-5 h-5 text-primary" />}
+                    {isEthConnected && <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />}
                   </div>
                 </div>
 
@@ -377,16 +377,16 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                   <ArrowRight className="w-5 h-5 text-white/40" />
                 </div>
 
-                <div className="p-4 border-2 border-purple-500/30 rounded-lg bg-purple-500/10">
-                  <div className="flex items-center gap-3">
-                    <Wallet className="w-5 h-5 text-purple-400" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-white font-mono">Sui Wallet</p>
-                      <p className="text-xs text-white/60 font-mono truncate">
+                <div className="p-3 sm:p-4 border-2 border-[#424242] rounded-lg bg-[#121212]/50 overflow-hidden">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <p className="text-xs sm:text-sm font-medium text-white font-mono">Sui Wallet</p>
+                      <div className="text-xs text-white/60 font-mono break-all leading-tight">
                         {suiAddress || 'Not connected'}
-                      </p>
+                      </div>
                     </div>
-                    {isSuiConnected && <CheckCircle2 className="w-5 h-5 text-primary" />}
+                    {isSuiConnected && <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />}
                   </div>
                 </div>
               </div>
@@ -473,7 +473,7 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                     href={getEnsExplorerUrl(registeredName)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block w-full p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 transition text-center text-sm font-mono text-white"
+                    className="block w-full p-3 bg-[#121212]/50 border border-[#424242] rounded-lg hover:border-primary transition text-center text-sm font-mono text-white"
                   >
                     View on ENS App →
                   </a>
@@ -481,7 +481,7 @@ export function ENSRegistrationModal({ isOpen, onClose }: ENSRegistrationModalPr
                     href={getSepoliaExplorerUrl(registrationHash)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block w-full p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg hover:bg-purple-500/20 transition text-center text-sm font-mono text-white"
+                    className="block w-full p-3 bg-[#121212]/50 border border-[#424242] rounded-lg hover:border-primary transition text-center text-sm font-mono text-white"
                   >
                     View Transaction →
                   </a>
